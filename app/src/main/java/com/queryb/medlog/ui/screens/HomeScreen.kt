@@ -52,7 +52,7 @@ fun HomeScreen(
     viewModel: LabViewModel,
     username: String,
     onAddClick: () -> Unit,
-    onChartClick: () -> Unit,
+    onDetailClick: (String) -> Unit,   // ← replaces onChartClick
     onProfileClick: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -148,9 +148,6 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onChartClick) {
-                        Icon(Icons.Default.ShowChart, "Trends", tint = Color.White)
-                    }
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(Icons.Default.MoreVert, "Menu", tint = Color.White)
@@ -177,13 +174,6 @@ fun HomeScreen(
                                     Icon(Icons.Default.Person, null, tint = Teal)
                                 },
                                 onClick = { menuExpanded = false; onProfileClick() }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Health Trends") },
-                                leadingIcon = {
-                                    Icon(Icons.Default.ShowChart, null, tint = Teal)
-                                },
-                                onClick = { menuExpanded = false; onChartClick() }
                             )
                             HorizontalDivider()
                             DropdownMenuItem(
@@ -235,20 +225,22 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     StatCard(
-                        modifier    = Modifier.weight(1f),
-                        icon        = Icons.Outlined.Bloodtype,
-                        label       = "Blood Sugar",
-                        value       = latestGlucose?.let { "%.1f".format(it) } ?: "--",
-                        unit        = "mg/dL",
-                        trendColor  = glucoseColor(latestGlucose)
+                        modifier   = Modifier.weight(1f),
+                        icon       = Icons.Outlined.Bloodtype,
+                        label      = "Blood Sugar",
+                        value      = latestGlucose?.let { "%.1f".format(it) } ?: "--",
+                        unit       = "mg/dL",
+                        trendColor = glucoseColor(latestGlucose),
+                        onClick    = { onDetailClick("glucose") }
                     )
                     StatCard(
-                        modifier    = Modifier.weight(1f),
-                        icon        = Icons.Outlined.Favorite,
-                        label       = "Cholesterol",
-                        value       = latestCholesterol?.let { "%.1f".format(it) } ?: "--",
-                        unit        = "mg/dL",
-                        trendColor  = cholesterolColor(latestCholesterol)
+                        modifier   = Modifier.weight(1f),
+                        icon       = Icons.Outlined.Favorite,
+                        label      = "Cholesterol",
+                        value      = latestCholesterol?.let { "%.1f".format(it) } ?: "--",
+                        unit       = "mg/dL",
+                        trendColor = cholesterolColor(latestCholesterol),
+                        onClick    = { onDetailClick("cholesterol") }
                     )
                 }
             }
@@ -338,14 +330,19 @@ private fun StatCard(
     label: String,
     value: String,
     unit: String,
-    trendColor: Color
+    trendColor: Color,
+    onClick: (() -> Unit)? = null          // ← ADD
 ) {
     Card(
+        onClick = { onClick?.invoke() },   // ← Card has built-in onClick
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardWhite),
         elevation = CardDefaults.cardElevation(0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, TealMid)
+        border = BorderStroke(
+            width = if (onClick != null) 1.5.dp else 1.dp,   // slightly bolder when clickable
+            color = if (onClick != null) TealMid else TealMid
+        )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -16,6 +16,8 @@ object Routes {
     const val ADD        = "add_entry"
     const val CHART      = "chart"
     const val PROFILE    = "profile"
+    const val DETAIL     = "detail/{metric}"   // ← ADD
+    fun detail(metric: String) = "detail/$metric"  // ← helper
 }
 
 @Composable
@@ -68,13 +70,12 @@ fun NavGraph(
 
         composable(Routes.HOME) {
             HomeScreen(
-                viewModel      = viewModel,
-                username       = authManager.getDisplayName()
-                    .ifEmpty { authManager.getUsername() },
-                onAddClick     = { navController.navigate(Routes.ADD) },
-                onChartClick   = { navController.navigate(Routes.CHART) },
+                viewModel     = viewModel,
+                username      = authManager.getDisplayName().ifEmpty { authManager.getUsername() },
+                onAddClick    = { navController.navigate(Routes.ADD) },
+                onDetailClick = { metric -> navController.navigate(Routes.detail(metric)) }, // ← updated
                 onProfileClick = { navController.navigate(Routes.PROFILE) },
-                onLogout       = { goLogin() }
+                onLogout      = { goLogin() }
             )
         }
 
@@ -98,6 +99,19 @@ fun NavGraph(
                 authManager = authManager,
                 onBack      = { navController.popBackStack() },
                 onLogout    = { goLogin() }
+            )
+        }
+        composable(
+            route = Routes.DETAIL,
+            arguments = listOf(
+                androidx.navigation.navArgument("metric") { type = androidx.navigation.NavType.StringType }
+            )
+        ) { backStack ->
+            val metric = backStack.arguments?.getString("metric") ?: "glucose"
+            ChartDetailScreen(
+                metric    = metric,
+                viewModel = viewModel,
+                onBack    = { navController.popBackStack() }
             )
         }
     }
