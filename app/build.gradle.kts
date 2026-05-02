@@ -17,7 +17,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.2"
+        versionName = "1.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -79,6 +79,7 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     // Horizontal Pager (ViewPager2 equivalent in Compose)
     implementation("androidx.compose.foundation:foundation:1.7.0")
+    implementation("androidx.sqlite:sqlite:2.4.0")
 
 
 }
