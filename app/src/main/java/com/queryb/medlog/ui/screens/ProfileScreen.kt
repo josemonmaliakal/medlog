@@ -1,7 +1,8 @@
 package com.queryb.medlog.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -9,21 +10,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.queryb.medlog.auth.AuthManager
-import com.queryb.medlog.ui.theme.*
+import com.queryb.medlog.ui.components.LogoutConfirmDialog
 
+// ── Colors ─────────────────────────────────────────────────────────────────────
+private val Teal       = Color(0xFF00897B)
+private val TealLight  = Color(0xFFE8F5F3)
+private val TealMid    = Color(0xFFB2DFDB)
+private val NavyDark   = Color(0xFF0D1B2A)
+private val GrayMuted  = Color(0xFF9CA3AF)
+private val GrayText   = Color(0xFF6B7280)
+private val ScreenBg   = Color(0xFFF8FFFE)
+private val CardWhite  = Color(0xFFFFFFFF)
+private val ErrorRed   = Color(0xFFD32F2F)
+private val ErrorLight = Color(0xFFFFEBEE)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,206 +52,249 @@ fun ProfileScreen(
     var newPassword     by remember { mutableStateOf("") }
     var confirmNew      by remember { mutableStateOf("") }
 
-    var showCurrentPw  by remember { mutableStateOf(false) }
-    var showNewPw      by remember { mutableStateOf(false) }
-    var showConfirmPw  by remember { mutableStateOf(false) }
+    var showCurrentPw by remember { mutableStateOf(false) }
+    var showNewPw     by remember { mutableStateOf(false) }
+    var showConfirmPw by remember { mutableStateOf(false) }
 
-    var profileMsg     by remember { mutableStateOf("") }
-    var profileSuccess by remember { mutableStateOf(false) }
-    var passwordMsg    by remember { mutableStateOf("") }
+    var profileMsg      by remember { mutableStateOf("") }
+    var profileSuccess  by remember { mutableStateOf(false) }
+    var passwordMsg     by remember { mutableStateOf("") }
     var passwordSuccess by remember { mutableStateOf(false) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
 
-    // ── Logout Dialog ─────────────────────────────────────────────────────────
+    // ── Logout dialog ─────────────────────────────────────────────────────────
     if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            icon  = { Icon(Icons.Default.Logout, null, tint = ErrorRed) },
-            title = { Text("Log Out") },
-            text  = { Text("Are you sure you want to log out?") },
-            confirmButton = {
-                Button(
-                    onClick = { showLogoutDialog = false; onLogout() },
-                    colors  = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                ) { Text("Log Out") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("Cancel") }
-            }
+        LogoutConfirmDialog(
+            username  = authManager.getUsername(),
+            onConfirm = { showLogoutDialog = false; onLogout() },
+            onDismiss = { showLogoutDialog = false }
         )
     }
 
-    // ── UI ────────────────────────────────────────────────────────────────────
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("My Profile", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "My Profile",
+                        fontWeight = FontWeight.Bold,
+                        fontSize   = 18.sp,
+                        color      = Color.White
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MedBlue,
+                    containerColor    = Teal,
                     titleContentColor = Color.White
                 )
             )
         },
-        containerColor = SurfaceWhite
+        containerColor = ScreenBg
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── Avatar ────────────────────────────────────────────────────────
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+            // ── Avatar header ─────────────────────────────────────────────────
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(20.dp),
+                colors    = CardDefaults.cardColors(containerColor = Teal),
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    modifier          = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Avatar circle
                     Box(
                         modifier = Modifier
-                            .size(88.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
-                            .background(MedBlue),
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = (authManager.getDisplayName().ifEmpty {
                                 authManager.getUsername()
                             }).take(1).uppercase(),
-                            color = Color.White,
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold
+                            color      = Color.White,
+                            fontSize   = 26.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        authManager.getUsername(),
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = TextDark
-                    )
-                    Text(
-                        "MedLog account",
-                        fontSize = 12.sp,
-                        color = TextMuted
-                    )
+
+                    Spacer(Modifier.width(16.dp))
+
+                    Column {
+                        Text(
+                            text = authManager.getDisplayName()
+                                .ifEmpty { authManager.getUsername() }
+                                .replaceFirstChar { it.uppercase() },
+                            color      = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 17.sp
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Outlined.AccountCircle, null,
+                                tint     = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text  = "@${authManager.getUsername()}",
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 13.sp
+                            )
+                        }
+                        if (authManager.getEmail().isNotEmpty()) {
+                            Spacer(Modifier.height(2.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.Email, null,
+                                    tint     = Color.White.copy(alpha = 0.75f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text     = authManager.getEmail(),
+                                    color    = Color.White.copy(alpha = 0.75f),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
-            // ── Profile Info Card ─────────────────────────────────────────────
-            ProfileCard(title = "Personal Information", icon = Icons.Default.Person) {
-
-                OutlinedTextField(
-                    value = displayName,
-                    onValueChange = { displayName = it; profileMsg = "" },
-                    label = { Text("Display Name") },
-                    leadingIcon = { Icon(Icons.Outlined.Badge, contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+            // ── Personal information card ─────────────────────────────────────
+            ProfileCard(
+                title = "Personal Information",
+                icon  = Icons.Outlined.Person
+            ) {
+                ProfileField(
+                    label        = "Display Name",
+                    value        = displayName,
+                    onValueChange = {
+                        displayName = it
+                        profileMsg  = ""
+                    },
+                    placeholder  = "Your name or nickname",
+                    icon         = Icons.Outlined.Badge,
+                    keyboardType = KeyboardType.Text
                 )
-
-                Spacer(Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it; profileMsg = "" },
-                    label = { Text("Email (optional)") },
-                    leadingIcon = { Icon(Icons.Default.Email, null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                // Feedback
-                AnimatedVisibility(profileMsg.isNotEmpty()) {
-                    Text(
-                        profileMsg,
-                        color = if (profileSuccess) MedGreen else ErrorRed,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
 
                 Spacer(Modifier.height(12.dp))
+
+                ProfileField(
+                    label        = "Email (optional)",
+                    value        = email,
+                    onValueChange = {
+                        email      = it
+                        profileMsg = ""
+                    },
+                    placeholder  = "your@email.com",
+                    icon         = Icons.Outlined.Email,
+                    keyboardType = KeyboardType.Email
+                )
+
+                // Feedback banner
+                if (profileMsg.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    FeedbackBanner(message = profileMsg, success = profileSuccess)
+                }
+
+                Spacer(Modifier.height(16.dp))
 
                 Button(
                     onClick = {
                         val ok = authManager.updateDisplayName(displayName)
                         authManager.updateEmail(email)
                         profileSuccess = ok
-                        profileMsg = if (ok) "✅ Profile updated!" else "Display name cannot be empty"
+                        profileMsg     = if (ok) "Profile updated successfully"
+                        else "Display name cannot be empty"
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MedBlue)
+                    modifier  = Modifier.fillMaxWidth().height(48.dp),
+                    shape     = RoundedCornerShape(12.dp),
+                    colors    = ButtonDefaults.buttonColors(containerColor = Teal),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
                 ) {
-                    Icon(Icons.Default.Save, null)
+                    Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Save Changes")
+                    Text("Save Changes", fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // ── Change Password Card ──────────────────────────────────────────
-            ProfileCard(title = "Change Password", icon = Icons.Default.Lock) {
-
+            // ── Change password card ──────────────────────────────────────────
+            ProfileCard(
+                title = "Change Password",
+                icon  = Icons.Outlined.Lock
+            ) {
                 PasswordField(
-                    value = currentPassword,
-                    onValueChange = { currentPassword = it; passwordMsg = "" },
-                    label = "Current Password",
-                    visible = showCurrentPw,
+                    label    = "Current Password",
+                    value    = currentPassword,
+                    visible  = showCurrentPw,
+                    onValueChange = {
+                        currentPassword = it
+                        passwordMsg     = ""
+                    },
                     onToggle = { showCurrentPw = !showCurrentPw }
                 )
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 PasswordField(
-                    value = newPassword,
-                    onValueChange = { newPassword = it; passwordMsg = "" },
-                    label = "New Password",
-                    visible = showNewPw,
+                    label    = "New Password",
+                    value    = newPassword,
+                    visible  = showNewPw,
+                    onValueChange = {
+                        newPassword = it
+                        passwordMsg = ""
+                    },
                     onToggle = { showNewPw = !showNewPw }
                 )
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
 
                 PasswordField(
-                    value = confirmNew,
-                    onValueChange = { confirmNew = it; passwordMsg = "" },
-                    label = "Confirm New Password",
-                    visible = showConfirmPw,
+                    label    = "Confirm New Password",
+                    value    = confirmNew,
+                    visible  = showConfirmPw,
+                    onValueChange = {
+                        confirmNew  = it
+                        passwordMsg = ""
+                    },
                     onToggle = { showConfirmPw = !showConfirmPw }
                 )
 
-                // Feedback
-                AnimatedVisibility(passwordMsg.isNotEmpty()) {
-                    Text(
-                        passwordMsg,
-                        color = if (passwordSuccess) MedGreen else ErrorRed,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                if (passwordMsg.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    FeedbackBanner(message = passwordMsg, success = passwordSuccess)
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(16.dp))
 
                 Button(
                     onClick = {
                         passwordMsg = when {
                             currentPassword.isBlank() ->
                                 "Enter your current password"
-                            newPassword.length < 4 ->
+                            newPassword.length < 4    ->
                                 "New password must be at least 4 characters"
                             newPassword != confirmNew ->
                                 "New passwords do not match"
@@ -246,127 +302,234 @@ fun ProfileScreen(
                                 val ok = authManager.updatePassword(currentPassword, newPassword)
                                 passwordSuccess = ok
                                 if (ok) {
-                                    currentPassword = ""; newPassword = ""; confirmNew = ""
-                                    "✅ Password changed successfully!"
+                                    currentPassword = ""
+                                    newPassword     = ""
+                                    confirmNew      = ""
+                                    "Password changed successfully"
                                 } else {
-                                    "❌ Current password is incorrect"
+                                    "Current password is incorrect"
                                 }
                             }
                         }
-                        if (passwordMsg.startsWith("Enter") ||
-                            passwordMsg.startsWith("New password") ||
-                            passwordMsg.startsWith("New passwords")) {
+                        if (!passwordSuccess && passwordMsg != "Password changed successfully") {
                             passwordSuccess = false
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MedBlue)
+                    modifier  = Modifier.fillMaxWidth().height(48.dp),
+                    shape     = RoundedCornerShape(12.dp),
+                    colors    = ButtonDefaults.buttonColors(containerColor = Teal),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
                 ) {
-                    Icon(Icons.Default.LockReset, null)
+                    Icon(Icons.Default.LockReset, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Update Password")
+                    Text("Update Password", fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // ── Account Card ──────────────────────────────────────────────────
-            ProfileCard(title = "Account", icon = Icons.Default.ManageAccounts) {
+            // ── Account info card ─────────────────────────────────────────────
+            ProfileCard(
+                title = "Account",
+                icon  = Icons.Outlined.ManageAccounts
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier          = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
-                        Text("Username", fontWeight = FontWeight.Medium, fontSize = 14.sp)
-                        Text(authManager.getUsername(), color = TextMuted, fontSize = 13.sp)
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(TealLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.AccountCircle, null,
+                            tint = Teal, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Username",
+                            fontSize   = 11.sp,
+                            color      = GrayMuted,
+                            fontWeight = FontWeight.Medium)
+                        Text(
+                            "@${authManager.getUsername()}",
+                            fontSize   = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color      = NavyDark
+                        )
                     }
                     Surface(
-                        color = MedBlue.copy(alpha = 0.1f),
+                        color = TealLight,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            "Cannot be changed",
-                            fontSize = 10.sp,
-                            color = MedBlue,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            "Fixed",
+                            fontSize   = 10.sp,
+                            color      = Teal,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier   = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
 
                 Spacer(Modifier.height(16.dp))
 
+                // Log out button
                 OutlinedButton(
-                    onClick = { showLogoutDialog = true },
+                    onClick  = { showLogoutDialog = true },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed)
+                    shape    = RoundedCornerShape(12.dp),
+                    colors   = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f))
                 ) {
-                    Icon(Icons.Default.Logout, null)
+                    Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Log Out", fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
-// ── Helper Composables ────────────────────────────────────────────────────────
-
+// ── Profile card wrapper ───────────────────────────────────────────────────────
 @Composable
 private fun ProfileCard(
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(3.dp)
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border    = androidx.compose.foundation.BorderStroke(1.dp, TealMid)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            // Card title row
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = MedBlue,
-                    modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(title, fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp, color = TextDark)
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(TealLight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, null, tint = Teal, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text       = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize   = 14.sp,
+                    color      = NavyDark
+                )
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+            HorizontalDivider(
+                modifier  = Modifier.padding(vertical = 14.dp),
+                color     = TealLight,
+                thickness = 1.dp
+            )
+
             content()
         }
     }
 }
 
+// ── Outlined profile input field ───────────────────────────────────────────────
 @Composable
-private fun PasswordField(
+private fun ProfileField(
+    label: String,
     value: String,
     onValueChange: (String) -> Unit,
+    placeholder: String,
+    icon: ImageVector,
+    keyboardType: KeyboardType
+) {
+    OutlinedTextField(
+        value         = value,
+        onValueChange = onValueChange,
+        label         = { Text(label, fontSize = 13.sp) },
+        placeholder   = { Text(placeholder, color = GrayMuted, fontSize = 13.sp) },
+        leadingIcon   = { Icon(icon, null, tint = Teal, modifier = Modifier.size(18.dp)) },
+        singleLine    = true,
+        modifier      = Modifier.fillMaxWidth(),
+        shape         = RoundedCornerShape(12.dp),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = Teal,
+            unfocusedBorderColor = TealMid,
+            focusedLabelColor    = Teal,
+            cursorColor          = Teal
+        )
+    )
+}
+
+// ── Password field ─────────────────────────────────────────────────────────────
+@Composable
+private fun PasswordField(
     label: String,
+    value: String,
     visible: Boolean,
+    onValueChange: (String) -> Unit,
     onToggle: () -> Unit
 ) {
     OutlinedTextField(
-        value = value,
+        value         = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        leadingIcon = { Icon(Icons.Default.Lock, null) },
-        trailingIcon = {
+        label         = { Text(label, fontSize = 13.sp) },
+        leadingIcon   = {
+            Icon(Icons.Outlined.Lock, null, tint = Teal, modifier = Modifier.size(18.dp))
+        },
+        trailingIcon  = {
             IconButton(onClick = onToggle) {
                 Icon(
-                    if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                    contentDescription = null
+                    imageVector = if (visible) Icons.Default.VisibilityOff
+                    else Icons.Default.Visibility,
+                    contentDescription = null,
+                    tint     = GrayMuted,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         },
         visualTransformation = if (visible) VisualTransformation.None
         else PasswordVisualTransformation(),
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
+        singleLine    = true,
+        modifier      = Modifier.fillMaxWidth(),
+        shape         = RoundedCornerShape(12.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        shape = RoundedCornerShape(12.dp)
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor   = Teal,
+            unfocusedBorderColor = TealMid,
+            focusedLabelColor    = Teal,
+            cursorColor          = Teal
+        )
     )
+}
+
+// ── Feedback banner — success (teal) or error (red) ───────────────────────────
+@Composable
+private fun FeedbackBanner(message: String, success: Boolean) {
+    val bgColor   = if (success) TealLight      else ErrorLight
+    val textColor = if (success) Teal           else ErrorRed
+    val icon      = if (success) Icons.Default.CheckCircleOutline
+    else         Icons.Default.ErrorOutline
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor)
+            .border(1.dp, if (success) TealMid else ErrorRed.copy(alpha = 0.3f),
+                RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = textColor, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(message, fontSize = 12.sp, color = textColor, fontWeight = FontWeight.Medium)
+    }
 }
