@@ -142,4 +142,19 @@ class AuthManager(context: Context) {
         private const val KEY_CURRENT_USER = "current_user"
         private const val KEY_ALL_USERS    = "all_users"   // now a CSV string, not StringSet
     }
+    /**
+     * Resets password without requiring the old one.
+     * Returns false if username doesn't exist or new password is too short.
+     */
+    fun resetPassword(username: String, newPassword: String): Boolean {
+        val name = username.trim().lowercase()
+        val users = getAllUsers()
+        if (!users.contains(name)) return false
+        if (newPassword.length < 4) return false
+        prefs.edit { putString(pwKey(name), newPassword.hashCode().toString()) }
+        return true
+    }
+
+    fun usernameExists(username: String): Boolean =
+        getAllUsers().contains(username.trim().lowercase())
 }

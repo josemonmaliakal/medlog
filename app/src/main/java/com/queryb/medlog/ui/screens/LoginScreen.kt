@@ -40,7 +40,8 @@ private val GrayDivide = Color(0xFFF3F4F6)
 @Composable
 fun LoginScreen(
     authManager: AuthManager,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onForgotPassword: () -> Unit
 ) {
     var isRegisterMode  by remember { mutableStateOf(authManager.isFirstLaunch) }
     var username        by remember { mutableStateOf("") }
@@ -175,7 +176,7 @@ fun LoginScreen(
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     TextButton(
-                        onClick = { /* TODO: password reset flow */ },
+                        onClick =  onForgotPassword ,
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text(
