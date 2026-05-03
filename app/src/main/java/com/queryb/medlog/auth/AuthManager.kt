@@ -157,4 +157,22 @@ class AuthManager(context: Context) {
 
     fun usernameExists(username: String): Boolean =
         getAllUsers().contains(username.trim().lowercase())
+
+    // ── Biometric preference — per user ──────────────────────────────────────────
+
+    private fun bioKey(username: String) = "bio_enabled_$username"
+
+    fun isBiometricEnabled(username: String): Boolean =
+        prefs.getBoolean(bioKey(username.trim().lowercase()), false)
+
+    fun setBiometricEnabled(username: String, enabled: Boolean) {
+        prefs.edit { putBoolean(bioKey(username.trim().lowercase()), enabled) }
+    }
+
+    // Convenience for current logged-in user
+    fun isBiometricEnabledForCurrent(): Boolean =
+        isBiometricEnabled(currentUser)
+
+    fun setBiometricEnabledForCurrent(enabled: Boolean) =
+        setBiometricEnabled(currentUser, enabled)
 }

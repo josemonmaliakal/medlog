@@ -1,5 +1,6 @@
 package com.queryb.medlog.ui.screens
 
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,30 +13,34 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
 import com.queryb.medlog.auth.AuthManager
+import com.queryb.medlog.auth.BiometricHelper
+import com.queryb.medlog.auth.BiometricResult
 import com.queryb.medlog.ui.components.MedLogLogo
 
-private val Teal       = Color(0xFF00897B)
-private val TealLight  = Color(0xFFE8F5F3)
-private val NavyDark   = Color(0xFF0D1B2A)
-private val GrayMuted  = Color(0xFF9CA3AF)
-private val GrayText   = Color(0xFF6B7280)
-private val GrayLine   = Color(0xFFE0E0E0)
-private val GrayDivide = Color(0xFFF3F4F6)
+private val Teal      = Color(0xFF00897B)
+private val TealLight = Color(0xFFE8F5F3)
+private val TealMid   = Color(0xFFB2DFDB)
+private val NavyDark  = Color(0xFF0D1B2A)
+private val GrayMuted = Color(0xFF9CA3AF)
+private val GrayText  = Color(0xFF6B7280)
+private val GrayLine  = Color(0xFFE0E0E0)
+private val ErrorRed  = Color(0xFFD32F2F)
 
 @Composable
 fun LoginScreen(
@@ -43,25 +48,55 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onForgotPassword: () -> Unit
 ) {
-    var isRegisterMode  by remember { mutableStateOf(authManager.isFirstLaunch) }
-    var username        by remember { mutableStateOf("") }
-    var password        by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var confirmVisible  by remember { mutableStateOf(false) }
-    var errorMessage    by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+
+    var isRegisterMode   by remember { mutableStateOf(authManager.isFirstLaunch) }
+    var username         by remember { mutableStateOf("") }
+    var password         by remember { mutableStateOf("") }
+    var confirmPassword  by remember { mutableStateOf("") }
+    var passwordVisible  by remember { mutableStateOf(false) }
+    var confirmVisible   by remember { mutableStateOf(false) }
+    var errorMessage     by remember { mutableStateOf("") }
+
+    // Check if returning user has biometric enabled
+    val biometricAvailable = remember { BiometricHelper.isAvailable(context) }
+    val lastUser           = remember { authManager.getUsername() }
+    val biometricEnabled   = remember {
+        !authManager.isFirstLaunch &&
+                lastUser.isNotEmpty() &&
+                authManager.isBiometricEnabled(lastUser) &&
+                biometricAvailable
+    }
+
+    // Auto-trigger biometric on first composition if enabled
+    LaunchedEffect(biometricEnabled) {
+        if (biometricEnabled && activity != null) {
+            BiometricHelper.authenticate(
+                activity = activity,
+                title    = "Welcome back",
+                subtitle = "Verify to continue as ${lastUser.replaceFirstChar { it.uppercase() }}"
+            ) { result ->
+                when (result) {
+                    is BiometricResult.Success   -> onLoginSuccess()
+                    is BiometricResult.Cancelled -> { /* stay on screen */ }
+                    is BiometricResult.Error     -> errorMessage = result.message
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-
         // ── TOP — white header with logo ──────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.40f),
+                .weight(0.40f)
+                .background(Color.White),
             contentAlignment = Alignment.Center
         ) {
             Column(
@@ -77,29 +112,24 @@ fun LoginScreen(
                 ) {
                     MedLogLogo(size = 56.dp)
                 }
-
                 Spacer(Modifier.height(14.dp))
-
                 Text(
-                    text = "MEDLOG",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
+                    text          = "MEDLOG",
+                    fontSize      = 18.sp,
+                    fontWeight    = FontWeight.Bold,
                     letterSpacing = 6.sp,
-                    color = Teal
+                    color         = Teal
                 )
-
                 Spacer(Modifier.height(4.dp))
-
                 Text(
-                    text = "Your personal health tracker",
+                    text     = "Your personal health tracker",
                     fontSize = 12.sp,
-                    color = GrayMuted
+                    color    = GrayMuted
                 )
             }
         }
 
-        // Subtle divider between header and form
-        HorizontalDivider(color = GrayDivide, thickness = 1.dp)
+        HorizontalDivider(color = Color(0xFFF3F4F6), thickness = 1.dp)
 
         // ── BOTTOM — form area ────────────────────────────────────────────────
         Column(
@@ -111,100 +141,98 @@ fun LoginScreen(
                 .padding(top = 32.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
-            // Heading
             Text(
-                text = if (isRegisterMode) "Create Account." else "Let's Get In.",
-                fontSize = 26.sp,
+                text       = if (isRegisterMode) "Create Account." else "Let's Get In.",
+                fontSize   = 26.sp,
                 fontWeight = FontWeight.Bold,
-                color = NavyDark,
-                modifier = Modifier.fillMaxWidth()
+                color      = NavyDark,
+                modifier   = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(32.dp))
 
-            // ── Username ──────────────────────────────────────────────────────
+            // Username field
             UnderlineField(
-                value = username,
+                value         = username,
                 onValueChange = { username = it; errorMessage = "" },
-                label = "Username",
-                keyboardType = KeyboardType.Text,
-                imeAction = ImeAction.Next
+                label         = "Username",
+                keyboardType  = KeyboardType.Text,
+                imeAction     = ImeAction.Next
             )
 
             Spacer(Modifier.height(24.dp))
 
-            // ── Password ──────────────────────────────────────────────────────
+            // Password field
             UnderlineField(
-                value = password,
-                onValueChange = { password = it; errorMessage = "" },
-                label = "Password",
-                keyboardType = KeyboardType.Password,
-                imeAction = if (isRegisterMode) ImeAction.Next else ImeAction.Done,
-                isPassword = true,
-                passwordVisible = passwordVisible,
+                value            = password,
+                onValueChange    = { password = it; errorMessage = "" },
+                label            = "Password",
+                keyboardType     = KeyboardType.Password,
+                imeAction        = if (isRegisterMode) ImeAction.Next else ImeAction.Done,
+                isPassword       = true,
+                passwordVisible  = passwordVisible,
                 onTogglePassword = { passwordVisible = !passwordVisible }
             )
 
-            // ── Confirm password (register mode only) ─────────────────────────
+            // Confirm password (register only)
             AnimatedVisibility(visible = isRegisterMode) {
                 Column {
                     Spacer(Modifier.height(24.dp))
                     UnderlineField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it; errorMessage = "" },
-                        label = "Confirm Password",
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done,
-                        isPassword = true,
-                        passwordVisible = confirmVisible,
+                        value            = confirmPassword,
+                        onValueChange    = { confirmPassword = it; errorMessage = "" },
+                        label            = "Confirm Password",
+                        keyboardType     = KeyboardType.Password,
+                        imeAction        = ImeAction.Done,
+                        isPassword       = true,
+                        passwordVisible  = confirmVisible,
                         onTogglePassword = { confirmVisible = !confirmVisible }
                     )
                 }
             }
 
-            // ── Forgot password (login mode only) ─────────────────────────────
+            // Forgot password (login only)
             AnimatedVisibility(
                 visible = !isRegisterMode,
-                enter = fadeIn(),
-                exit  = fadeOut()
+                enter   = fadeIn(),
+                exit    = fadeOut()
             ) {
                 Box(
-                    modifier = Modifier
+                    modifier            = Modifier
                         .fillMaxWidth()
                         .padding(top = 6.dp),
-                    contentAlignment = Alignment.CenterEnd
+                    contentAlignment    = Alignment.CenterEnd
                 ) {
                     TextButton(
-                        onClick =  onForgotPassword ,
+                        onClick        = onForgotPassword,
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text(
-                            text = "Forgot Password?",
-                            color = Teal,
-                            fontSize = 13.sp,
+                            "Forgot Password?",
+                            color      = Teal,
+                            fontSize   = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
 
-            // ── Error message ─────────────────────────────────────────────────
+            // Error message
             AnimatedVisibility(visible = errorMessage.isNotEmpty()) {
                 Text(
-                    text = errorMessage,
-                    color = MaterialTheme.colorScheme.error,
-                    fontSize = 13.sp,
+                    text      = errorMessage,
+                    color     = ErrorRed,
+                    fontSize  = 13.sp,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
+                    modifier  = Modifier
                         .fillMaxWidth()
                         .padding(top = 12.dp)
                 )
             }
 
-            Spacer(Modifier.height(36.dp))
+            Spacer(Modifier.height(32.dp))
 
-            // ── Primary CTA button ────────────────────────────────────────────
+            // Primary button
             Button(
                 onClick = {
                     errorMessage = ""
@@ -214,7 +242,8 @@ fun LoginScreen(
                             return@Button
                         }
                         when (authManager.registerWithResult(username, password)) {
-                            AuthManager.RegisterResult.SUCCESS        -> onLoginSuccess()
+                            AuthManager.RegisterResult.SUCCESS ->
+                                onLoginSuccess()
                             AuthManager.RegisterResult.USERNAME_TAKEN ->
                                 errorMessage = "Username \"$username\" is already taken"
                             AuthManager.RegisterResult.USERNAME_BLANK ->
@@ -230,49 +259,95 @@ fun LoginScreen(
                         }
                     }
                 },
-                modifier = Modifier
+                modifier  = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Teal),
+                shape     = RoundedCornerShape(14.dp),
+                colors    = ButtonDefaults.buttonColors(containerColor = Teal),
                 elevation = ButtonDefaults.buttonElevation(0.dp)
             ) {
                 Text(
-                    text = if (isRegisterMode) "Sign Up" else "Login",
-                    fontSize = 16.sp,
+                    text       = if (isRegisterMode) "Sign Up" else "Login",
+                    fontSize   = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp
                 )
             }
 
+            // Biometric button — shown in login mode when enabled
+            AnimatedVisibility(
+                visible = !isRegisterMode && biometricEnabled && activity != null,
+                enter   = fadeIn(),
+                exit    = fadeOut()
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = {
+                            activity?.let {
+                                BiometricHelper.authenticate(
+                                    activity = it,
+                                    title    = "Welcome back",
+                                    subtitle = "Verify to continue"
+                                ) { result ->
+                                    when (result) {
+                                        is BiometricResult.Success   -> onLoginSuccess()
+                                        is BiometricResult.Cancelled -> { }
+                                        is BiometricResult.Error     ->
+                                            errorMessage = result.message
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        shape  = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, TealMid)
+                    ) {
+                        Icon(
+                            Icons.Default.Fingerprint, null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "Use Biometric / PIN",
+                            fontSize   = 15.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
 
-            // ── Switch register / login mode ──────────────────────────────────
+            // Switch mode
             Row(
                 horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment     = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isRegisterMode) "Already have an account?  "
+                    text     = if (isRegisterMode) "Already have an account?  "
                     else "Don't have an account?  ",
                     fontSize = 14.sp,
-                    color = GrayText
+                    color    = GrayText
                 )
                 TextButton(
-                    onClick = {
-                        isRegisterMode = !isRegisterMode
-                        errorMessage = ""
-                        username = ""
-                        password = ""
+                    onClick        = {
+                        isRegisterMode  = !isRegisterMode
+                        errorMessage    = ""
+                        username        = ""
+                        password        = ""
                         confirmPassword = ""
                     },
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text(
-                        text = if (isRegisterMode) "LOG IN" else "SIGN UP",
-                        fontSize = 14.sp,
+                        text       = if (isRegisterMode) "LOG IN" else "SIGN UP",
+                        fontSize   = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Teal
+                        color      = Teal
                     )
                 }
             }
@@ -280,8 +355,7 @@ fun LoginScreen(
     }
 }
 
-// ── Underline input field ─────────────────────────────────────────────────────
-
+// ── Underline input field ──────────────────────────────────────────────────────
 @Composable
 private fun UnderlineField(
     value: String,
@@ -295,33 +369,31 @@ private fun UnderlineField(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = label.uppercase(),
-            fontSize = 11.sp,
-            color = GrayMuted,
-            fontWeight = FontWeight.Medium,
+            text          = label.uppercase(),
+            fontSize      = 11.sp,
+            color         = GrayMuted,
+            fontWeight    = FontWeight.Medium,
             letterSpacing = 0.8.sp
         )
-
         Spacer(Modifier.height(8.dp))
-
         BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = TextStyle(
-                fontSize = 16.sp,
-                color = NavyDark,
+            value               = value,
+            onValueChange       = onValueChange,
+            singleLine          = true,
+            textStyle           = TextStyle(
+                fontSize   = 16.sp,
+                color      = NavyDark,
                 fontWeight = FontWeight.Normal
             ),
             visualTransformation = if (isPassword && !passwordVisible)
                 PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = KeyboardOptions(
+            keyboardOptions      = KeyboardOptions(
                 keyboardType = keyboardType,
-                imeAction = imeAction
+                imeAction    = imeAction
             ),
             decorationBox = { innerTextField ->
                 Row(
-                    modifier = Modifier
+                    modifier          = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -329,16 +401,16 @@ private fun UnderlineField(
                     Box(modifier = Modifier.weight(1f)) {
                         if (value.isEmpty()) {
                             Text(
-                                text = "Enter $label",
+                                text     = "Enter $label",
                                 fontSize = 16.sp,
-                                color = Color(0xFFD1D5DB)
+                                color    = Color(0xFFD1D5DB)
                             )
                         }
                         innerTextField()
                     }
                     if (isPassword && onTogglePassword != null) {
                         IconButton(
-                            onClick = onTogglePassword,
+                            onClick  = onTogglePassword,
                             modifier = Modifier.size(22.dp)
                         ) {
                             Icon(
@@ -347,7 +419,7 @@ private fun UnderlineField(
                                 else
                                     Icons.Default.Visibility,
                                 contentDescription = null,
-                                tint = GrayMuted,
+                                tint     = GrayMuted,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -356,10 +428,8 @@ private fun UnderlineField(
             },
             modifier = Modifier.fillMaxWidth()
         )
-
-        // Underline — teal when filled, gray when empty
         HorizontalDivider(
-            color = if (value.isNotEmpty()) Teal else GrayLine,
+            color     = if (value.isNotEmpty()) Teal else GrayLine,
             thickness = if (value.isNotEmpty()) 2.dp else 1.dp
         )
     }

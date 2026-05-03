@@ -2,7 +2,6 @@ package com.queryb.medlog.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,7 +23,12 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.queryb.medlog.auth.AuthManager
+import androidx.compose.ui.platform.LocalContext
 import com.queryb.medlog.ui.components.LogoutConfirmDialog
+import androidx.fragment.app.FragmentActivity
+import com.queryb.medlog.auth.BiometricHelper
+import com.queryb.medlog.auth.BiometricResult
+
 
 // ── Colors ─────────────────────────────────────────────────────────────────────
 private val Teal       = Color(0xFF00897B)
@@ -62,6 +66,12 @@ fun ProfileScreen(
     var passwordSuccess by remember { mutableStateOf(false) }
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val context  = LocalContext.current
+    val activity = context as? FragmentActivity
+    var biometricEnabled by remember {
+        mutableStateOf(authManager.isBiometricEnabledForCurrent())
+    }
+    val biometricAvailable = remember { BiometricHelper.isAvailable(context) }
 
     // ── Logout dialog ─────────────────────────────────────────────────────────
     if (showLogoutDialog) {
@@ -323,6 +333,92 @@ fun ProfileScreen(
                     Icon(Icons.Default.LockReset, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Update Password", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            // ── Biometric card — only shown if hardware available ─────────────────────────
+            if (biometricAvailable) {
+                ProfileCard(
+                    title = "Quick Access",
+                    icon  = Icons.Outlined.Fingerprint
+                ) {
+                    Row(
+                        modifier          = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Biometric / PIN Login",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize   = 14.sp,
+                                color      = NavyDark
+                            )
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                "Use fingerprint, face or device PIN\nto log in without a password",
+                                fontSize   = 12.sp,
+                                color      = GrayMuted,
+                                lineHeight = 17.sp
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked         = biometricEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled && activity != null) {
+                                    // Verify identity before enabling
+                                    BiometricHelper.authenticate(
+                                        activity = activity,
+                                        title    = "Confirm identity",
+                                        subtitle = "Verify to enable biometric login"
+                                    ) { result ->
+                                        when (result) {
+                                            is BiometricResult.Success -> {
+                                                biometricEnabled = true
+                                                authManager.setBiometricEnabledForCurrent(true)
+                                            }
+                                            else -> { /* do nothing — toggle stays off */ }
+                                        }
+                                    }
+                                } else {
+                                    biometricEnabled = false
+                                    authManager.setBiometricEnabledForCurrent(false)
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor  = Color.White,
+                                checkedTrackColor  = Teal,
+                                uncheckedThumbColor = GrayMuted,
+                                uncheckedTrackColor = Color(0xFFE0E0E0)
+                            )
+                        )
+                    }
+
+                    // Info note
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(TealLight)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Info, null,
+                            tint     = Teal,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text      = if (biometricEnabled)
+                                "Biometric login is active for this account"
+                            else
+                                "Enable to skip password on next login",
+                            fontSize  = 11.sp,
+                            color     = Teal,
+                            lineHeight = 16.sp
+                        )
+                    }
                 }
             }
 
