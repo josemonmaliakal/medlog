@@ -17,6 +17,7 @@ object Routes {
     const val CHART      = "chart"
     const val PROFILE    = "profile"
     const val DETAIL     = "detail/{metric}"   // ← ADD
+    const val HISTORY    = "history"
     fun detail(metric: String) = "detail/$metric"  // ← helper
 }
 
@@ -75,6 +76,7 @@ fun NavGraph(
                 onAddClick    = { navController.navigate(Routes.ADD) },
                 onDetailClick = { metric -> navController.navigate(Routes.detail(metric)) }, // ← updated
                 onProfileClick = { navController.navigate(Routes.PROFILE) },
+                onHistoryClick = { navController.navigate(Routes.HISTORY) },
                 onLogout      = { goLogin() }
             )
         }
@@ -99,6 +101,12 @@ fun NavGraph(
                 authManager = authManager,
                 onBack      = { navController.popBackStack() },
                 onLogout    = { goLogin() }
+            )
+        }
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                viewModel = viewModel,
+                onBack    = { navController.popBackStack() }
             )
         }
         composable(

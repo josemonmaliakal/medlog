@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,10 +36,8 @@ import android.app.TimePickerDialog
 import java.util.Calendar
 import androidx.compose.foundation.BorderStroke
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.statusBars
-
+import com.queryb.medlog.ui.utils.glucoseColor
+import com.queryb.medlog.ui.utils.cholesterolColor
 
 // ── Colors ─────────────────────────────────────────────────────────────────────
 private val Teal      = Color(0xFF00897B)
@@ -61,12 +58,11 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onDetailClick: (String) -> Unit,
     onProfileClick: () -> Unit,
+    onHistoryClick: () -> Unit,           // ← NEW
     onLogout: () -> Unit
 ) {
     val results by viewModel.results.collectAsState()
     val scope   = rememberCoroutineScope()
-
-    // Right-side drawer state
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     var resultToDelete   by remember { mutableStateOf<LabResult?>(null) }
@@ -81,7 +77,10 @@ fun HomeScreen(
     val avgCholesterol    = results.filter { it.cholesterol > 0 }
         .map { it.cholesterol }.average().takeIf { !it.isNaN() }
 
-    // ── Delete dialog ─────────────────────────────────────────────────────────
+    // Only show the 3 most recent entries in the dashboard card
+    val recentResults = results.take(3)
+
+    // ── Dialogs ───────────────────────────────────────────────────────────────
     resultToDelete?.let { result ->
         AlertDialog(
             onDismissRequest = { resultToDelete = null },
@@ -98,7 +97,6 @@ fun HomeScreen(
         )
     }
 
-    // ── Logout dialog ─────────────────────────────────────────────────────────
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -117,7 +115,6 @@ fun HomeScreen(
         )
     }
 
-    // ── Quick add dialog ──────────────────────────────────────────────────────
     if (showQuickAdd) {
         QuickAddDialog(
             onDismiss = { showQuickAdd = false },
@@ -125,13 +122,12 @@ fun HomeScreen(
         )
     }
 
-    // ── RTL wrapper anchors the drawer to the RIGHT edge ─────────────────────
+    // ── Right-side drawer ─────────────────────────────────────────────────────
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         ModalNavigationDrawer(
             drawerState     = drawerState,
             gesturesEnabled = true,
             drawerContent   = {
-                // Flip content back to LTR inside the panel
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                     SidePanelContent(
                         username    = username,
@@ -140,7 +136,6 @@ fun HomeScreen(
                             onProfileClick()
                         },
                         onDashboard = { scope.launch { drawerState.close() } },
-
                         onLogout    = {
                             scope.launch { drawerState.close() }
                             showLogoutDialog = true
@@ -149,7 +144,6 @@ fun HomeScreen(
                 }
             }
         ) {
-            // Flip main content back to LTR
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Scaffold(
                     topBar = {
@@ -182,7 +176,6 @@ fun HomeScreen(
                                 }
                             },
                             actions = {
-                                // Avatar circle — replaces MoreVert dropdown
                                 Box(
                                     modifier = Modifier
                                         .padding(end = 12.dp)
@@ -227,10 +220,7 @@ fun HomeScreen(
 
                         // ── Latest readings ───────────────────────────────────
                         item {
-                            Text("Latest Readings",
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 14.sp,
-                                color      = GrayText)
+                            SectionLabel("Latest Readings")
                             Spacer(Modifier.height(8.dp))
                             Row(
                                 modifier              = Modifier.fillMaxWidth(),
@@ -259,10 +249,7 @@ fun HomeScreen(
 
                         // ── Averages ──────────────────────────────────────────
                         item {
-                            Text("Averages",
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 14.sp,
-                                color      = GrayText)
+                            SectionLabel("Averages")
                             Spacer(Modifier.height(8.dp))
                             Row(
                                 modifier              = Modifier.fillMaxWidth(),
@@ -287,45 +274,15 @@ fun HomeScreen(
                             }
                         }
 
-                        // ── History ───────────────────────────────────────────
+                        // ── Recent history card ───────────────────────────────
                         item {
-                            Text("History",
-                                fontWeight = FontWeight.Bold,
-                                fontSize   = 14.sp,
-                                color      = GrayText)
-                        }
-
-                        // ── Empty state ───────────────────────────────────────
-                        if (results.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier            = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 40.dp),
-                                    contentAlignment    = Alignment.Center
-                                ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(Icons.Outlined.Science, null,
-                                            modifier = Modifier.size(64.dp),
-                                            tint     = TealMid)
-                                        Spacer(Modifier.height(12.dp))
-                                        Text("No results yet",
-                                            color      = GrayMuted,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize   = 15.sp)
-                                        Text("Tap Log Reading to get started",
-                                            color    = GrayMuted,
-                                            fontSize = 13.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        // ── Result rows ───────────────────────────────────────
-                        items(results, key = { it.id }) { result ->
-                            HistoryCard(
-                                result   = result,
-                                onDelete = { resultToDelete = result }
+                            SectionLabel("Recent History")
+                            Spacer(Modifier.height(8.dp))
+                            RecentHistoryCard(
+                                results         = recentResults,
+                                totalCount      = results.size,
+                                onSeeAll        = onHistoryClick,
+                                onDeleteResult  = { resultToDelete = it }
                             )
                         }
 
@@ -337,26 +294,189 @@ fun HomeScreen(
     }
 }
 
+// ── Compact recent history card shown on dashboard ─────────────────────────────
+@Composable
+private fun RecentHistoryCard(
+    results: List<LabResult>,
+    totalCount: Int,
+    onSeeAll: () -> Unit,
+    onDeleteResult: (LabResult) -> Unit
+) {
+    Card(
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border    = BorderStroke(1.dp, TealMid)
+    ) {
+        Column {
+            if (results.isEmpty()) {
+                Box(
+                    modifier            = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment    = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Outlined.Science, null,
+                            modifier = Modifier.size(40.dp), tint = TealMid)
+                        Spacer(Modifier.height(8.dp))
+                        Text("No readings yet", color = GrayMuted,
+                            fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("Tap Log Reading to get started",
+                            color = GrayMuted, fontSize = 11.sp)
+                    }
+                }
+            } else {
+                results.forEachIndexed { index, result ->
+                    CompactHistoryRow(result = result, onDelete = { onDeleteResult(result) })
+                    if (index < results.lastIndex) {
+                        HorizontalDivider(
+                            color     = TealLight,
+                            thickness = 1.dp
+                        )
+                    }
+                }
+            }
+
+            // ── See all footer ────────────────────────────────────────────────
+            if (totalCount > 0) {
+                HorizontalDivider(color = TealLight, thickness = 1.dp)
+                Row(
+                    modifier              = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSeeAll() }
+                        .background(ScreenBg)
+                        .padding(vertical = 11.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text       = if (totalCount > 3)
+                            "See all $totalCount entries"
+                        else
+                            "View full history",
+                        fontSize   = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = Teal
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.ChevronRight, null,
+                        tint     = Teal,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Single slim row inside the dashboard history card ─────────────────────────
+@Composable
+private fun CompactHistoryRow(result: LabResult, onDelete: () -> Unit) {
+    Row(
+        modifier          = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Date badge
+        Surface(color = TealLight, shape = RoundedCornerShape(6.dp)) {
+            Text(
+                // Show "Apr 28" style short date
+                text = formatShortDate(result.date),
+                color      = Teal,
+                fontWeight = FontWeight.Bold,
+                fontSize   = 9.sp,
+                modifier   = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+            )
+        }
+
+        Spacer(Modifier.width(10.dp))
+
+        // Summary + meta
+        Column(modifier = Modifier.weight(1f)) {
+            val parts = buildList {
+                if (result.glucose > 0)     add("Sugar: ${"%.0f".format(result.glucose)}")
+                if (result.cholesterol > 0) add("Chol: ${"%.0f".format(result.cholesterol)}")
+            }
+            Text(
+                text       = parts.joinToString(" · ").ifEmpty { "No values" },
+                fontSize   = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = NavyDark
+            )
+            val meta = buildList {
+                if (result.time.isNotEmpty())        add(result.time)
+                if (result.readingType.isNotEmpty()) add(result.readingType)
+            }
+            if (meta.isNotEmpty()) {
+                Text(
+                    text     = meta.joinToString(" · "),
+                    fontSize = 10.sp,
+                    color    = GrayMuted
+                )
+            }
+        }
+
+        // Status dot
+        val dotColor = when {
+            result.glucose > 0      -> glucoseColor(result.glucose)
+            result.cholesterol > 0  -> cholesterolColor(result.cholesterol)
+            else                    -> GrayMuted
+        }
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(dotColor)
+        )
+
+        Spacer(Modifier.width(10.dp))
+
+        // Delete
+        IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+            Icon(
+                Icons.Default.DeleteOutline, null,
+                tint     = ErrorRed.copy(alpha = 0.45f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
+    }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+private fun formatShortDate(date: String): String {
+    return try {
+        val ld   = LocalDate.parse(date)
+        val month = ld.month.name.take(3).lowercase()
+            .replaceFirstChar { it.uppercase() }
+        "$month ${ld.dayOfMonth}"
+    } catch (e: Exception) {
+        date
+    }
+}
+
 // ── Side panel ─────────────────────────────────────────────────────────────────
 @Composable
 private fun SidePanelContent(
     username: String,
     onProfile: () -> Unit,
     onDashboard: () -> Unit,
-    onLogout: () -> Unit          // ← onTrends parameter removed
+    onLogout: () -> Unit
 ) {
     ModalDrawerSheet(
         drawerShape          = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
         drawerContainerColor = CardWhite,
-        windowInsets         = WindowInsets(0),   // ← removes the white status bar gap
+        windowInsets         = WindowInsets(0),
         modifier             = Modifier.width(260.dp)
     ) {
-        // ── Teal header — extends behind status bar ───────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Teal)
-                .windowInsetsPadding(WindowInsets.statusBars)  // ← pushes content below status bar but keeps teal bg
+                .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -394,7 +514,6 @@ private fun SidePanelContent(
 
         Spacer(Modifier.height(12.dp))
 
-        // ── Menu items ────────────────────────────────────────────────────────
         Column(
             modifier            = Modifier
                 .fillMaxWidth()
@@ -412,12 +531,10 @@ private fun SidePanelContent(
                 label   = "Dashboard",
                 onClick = onDashboard
             )
-            // Trends item removed
         }
 
         Spacer(Modifier.weight(1f))
 
-        // ── Logout pinned to bottom ───────────────────────────────────────────
         HorizontalDivider(
             color     = TealMid,
             thickness = 1.dp,
@@ -435,7 +552,7 @@ private fun SidePanelContent(
         Spacer(Modifier.height(16.dp))
     }
 }
-// ── Panel menu item ────────────────────────────────────────────────────────────
+
 @Composable
 private fun PanelMenuItem(
     icon: ImageVector,
@@ -457,9 +574,7 @@ private fun PanelMenuItem(
             .padding(horizontal = 14.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null,
-            tint     = iconColor,
-            modifier = Modifier.size(20.dp))
+        Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Text(
             text       = label,
@@ -470,7 +585,11 @@ private fun PanelMenuItem(
     }
 }
 
-// ── Stat card ──────────────────────────────────────────────────────────────────
+@Composable
+private fun SectionLabel(text: String) {
+    Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GrayText)
+}
+
 @Composable
 private fun StatCard(
     modifier: Modifier = Modifier,
@@ -487,10 +606,7 @@ private fun StatCard(
         shape     = RoundedCornerShape(16.dp),
         colors    = CardDefaults.cardColors(containerColor = CardWhite),
         elevation = CardDefaults.cardElevation(0.dp),
-        border    = BorderStroke(
-            width = if (onClick != null) 1.5.dp else 1.dp,
-            color = TealMid
-        )
+        border    = BorderStroke(if (onClick != null) 1.5.dp else 1.dp, TealMid)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -508,208 +624,15 @@ private fun StatCard(
                     fontWeight = FontWeight.Medium)
             }
             Spacer(Modifier.height(10.dp))
-            Text(value,
-                fontSize   = 26.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color      = trendColor)
+            Text(value, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = trendColor)
             Text(unit, fontSize = 11.sp, color = GrayMuted)
-        }
-    }
-}
-
-// ── History card ───────────────────────────────────────────────────────────────
-@Composable
-private fun HistoryCard(result: LabResult, onDelete: () -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-
-    val extraValues = buildList {
-        if (result.hdl > 0)           add("HDL: ${result.hdl} mg/dL")
-        if (result.ldl > 0)           add("LDL: ${result.ldl} mg/dL")
-        if (result.triglycerides > 0) add("Trig: ${result.triglycerides} mg/dL")
-        if (result.hemoglobin > 0)    add("Hgb: ${result.hemoglobin} g/dL")
-    }
-    val hasExtras = extraValues.isNotEmpty()
-
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(14.dp),
-        colors    = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(0.dp),
-        border    = BorderStroke(
-            width = if (expanded) 1.5.dp else 1.dp,
-            color = if (expanded) Teal else TealMid
-        )
-    ) {
-        Column {
-            Row(
-                modifier          = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                // ── Date / time / badge column ────────────────────────────────
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier            = Modifier.width(82.dp)
-                ) {
-                    Surface(color = TealLight, shape = RoundedCornerShape(8.dp)) {
-                        Text(
-                            result.date,
-                            color      = Teal,
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = 10.sp,
-                            modifier   = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    if (result.time.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            verticalAlignment     = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(Icons.Outlined.AccessTime, null,
-                                tint     = GrayMuted,
-                                modifier = Modifier.size(10.dp))
-                            Spacer(Modifier.width(3.dp))
-                            Text(result.time, fontSize = 10.sp, color = GrayMuted)
-                        }
-                    }
-                    if (result.readingType.isNotEmpty()) {
-                        Spacer(Modifier.height(4.dp))
-                        val isFasting = result.readingType == "Fasting"
-                        Surface(
-                            color = if (isFasting) Color(0xFFFFF3E0) else TealLight,
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                result.readingType.uppercase(),
-                                fontSize   = 8.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = if (isFasting) Color(0xFFF57C00) else Teal,
-                                modifier   = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.width(10.dp))
-
-                // ── Values column ─────────────────────────────────────────────
-                Column(modifier = Modifier.weight(1f)) {
-                    if (result.glucose > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Bloodtype, null,
-                                tint     = glucoseColor(result.glucose),
-                                modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Sugar: ", fontSize = 12.sp, color = GrayText)
-                            Text("${result.glucose} mg/dL",
-                                fontSize   = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = glucoseColor(result.glucose))
-                        }
-                        Spacer(Modifier.height(3.dp))
-                    }
-                    if (result.cholesterol > 0) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Outlined.Favorite, null,
-                                tint     = cholesterolColor(result.cholesterol),
-                                modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Chol: ", fontSize = 12.sp, color = GrayText)
-                            Text("${result.cholesterol} mg/dL",
-                                fontSize   = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color      = cholesterolColor(result.cholesterol))
-                        }
-                        Spacer(Modifier.height(3.dp))
-                    }
-
-                    if (!hasExtras && result.pdfUri.isNotEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.PictureAsPdf, null,
-                                tint     = Teal,
-                                modifier = Modifier.size(10.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("PDF attached", fontSize = 10.sp, color = Teal)
-                        }
-                    }
-
-                    if (expanded && hasExtras) {
-                        Spacer(Modifier.height(6.dp))
-                        HorizontalDivider(color = TealMid.copy(alpha = 0.5f))
-                        Spacer(Modifier.height(6.dp))
-                        extraValues.forEach { v ->
-                            Text(v, fontSize = 11.sp, color = GrayText, lineHeight = 17.sp)
-                        }
-                        if (result.pdfUri.isNotEmpty()) {
-                            Spacer(Modifier.height(3.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.PictureAsPdf, null,
-                                    tint     = Teal,
-                                    modifier = Modifier.size(10.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("PDF attached", fontSize = 10.sp, color = Teal)
-                            }
-                        }
-                    }
-
-                    if (!expanded && hasExtras) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            "+${extraValues.size} more value${if (extraValues.size > 1) "s" else ""}",
-                            fontSize = 11.sp,
-                            color    = GrayMuted
-                        )
-                    }
-                }
-
-                // ── Delete ────────────────────────────────────────────────────
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.DeleteOutline, null,
-                        tint     = ErrorRed.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp))
-                }
-            }
-
-            // ── Expand footer (only when extras exist) ────────────────────────
-            if (hasExtras) {
-                HorizontalDivider(color = TealLight)
-                Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .clickable { expanded = !expanded }
-                        .background(ScreenBg)
-                        .padding(vertical = 7.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text       = if (expanded) "Show less" else "Show all values",
-                        fontSize   = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color      = Teal
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector        = if (expanded) Icons.Default.KeyboardArrowUp
-                        else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint               = Teal,
-                        modifier           = Modifier.size(14.dp)
-                    )
-                }
-            }
         }
     }
 }
 
 // ── Quick Add Dialog ───────────────────────────────────────────────────────────
 @Composable
-private fun QuickAddDialog(
-    onDismiss: () -> Unit,
-    onSave: (LabResult) -> Unit
-) {
+private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit) {
     val context = LocalContext.current
     val cal     = Calendar.getInstance()
 
@@ -738,15 +661,11 @@ private fun QuickAddDialog(
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-
-                Text("Log Reading",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize   = 20.sp,
-                    color      = NavyDark)
+                Text("Log Reading", fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp, color = NavyDark)
 
                 Spacer(Modifier.height(16.dp))
 
-                // Toggle tabs
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -766,24 +685,19 @@ private fun QuickAddDialog(
                                 .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(label,
-                                fontSize   = 13.sp,
+                            Text(label, fontSize = 13.sp,
                                 fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                                color      = if (active) Color.White else GrayText)
+                                color = if (active) Color.White else GrayText)
                         }
                     }
                 }
 
                 Spacer(Modifier.height(20.dp))
 
-                // Blood Sugar tab
                 if (selectedTab == 0) {
                     DialogField("Blood Sugar (mg/dL)", sugarValue,
-                        { sugarValue = it; errorMsg = "" },
-                        KeyboardType.Decimal, "e.g. 95")
-
+                        { sugarValue = it; errorMsg = "" }, KeyboardType.Decimal, "e.g. 95")
                     Spacer(Modifier.height(14.dp))
-
                     Text("Reading Type", fontSize = 12.sp,
                         color = GrayMuted, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(6.dp))
@@ -800,18 +714,14 @@ private fun QuickAddDialog(
                             )
                         }
                     }
-
                     Spacer(Modifier.height(14.dp))
                     DateTimeRow(sugarDate, sugarTime, context, cal,
                         { sugarDate = it }, { sugarTime = it })
                 }
 
-                // Cholesterol tab
                 if (selectedTab == 1) {
                     DialogField("Cholesterol (mg/dL)", cholValue,
-                        { cholValue = it; errorMsg = "" },
-                        KeyboardType.Decimal, "e.g. 180")
-
+                        { cholValue = it; errorMsg = "" }, KeyboardType.Decimal, "e.g. 180")
                     Spacer(Modifier.height(14.dp))
                     DateTimeRow(cholDate, cholTime, context, cal,
                         { cholDate = it }, { cholTime = it })
@@ -829,26 +739,16 @@ private fun QuickAddDialog(
                         if (selectedTab == 0) {
                             val v = sugarValue.toFloatOrNull()
                             if (v == null || v <= 0f) {
-                                errorMsg = "Enter a valid blood sugar value"
-                                return@Button
+                                errorMsg = "Enter a valid blood sugar value"; return@Button
                             }
-                            onSave(LabResult(
-                                date        = sugarDate,
-                                time        = sugarTime,
-                                readingType = readingType,
-                                glucose     = v
-                            ))
+                            onSave(LabResult(date = sugarDate, time = sugarTime,
+                                readingType = readingType, glucose = v))
                         } else {
                             val v = cholValue.toFloatOrNull()
                             if (v == null || v <= 0f) {
-                                errorMsg = "Enter a valid cholesterol value"
-                                return@Button
+                                errorMsg = "Enter a valid cholesterol value"; return@Button
                             }
-                            onSave(LabResult(
-                                date        = cholDate,
-                                time        = cholTime,
-                                cholesterol = v
-                            ))
+                            onSave(LabResult(date = cholDate, time = cholTime, cholesterol = v))
                         }
                     },
                     modifier  = Modifier.fillMaxWidth().height(50.dp),
@@ -860,7 +760,6 @@ private fun QuickAddDialog(
                 }
 
                 Spacer(Modifier.height(8.dp))
-
                 TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                     Text("Cancel", color = GrayMuted)
                 }
@@ -869,20 +768,14 @@ private fun QuickAddDialog(
     }
 }
 
-// ── Date + time row ────────────────────────────────────────────────────────────
 @Composable
 private fun DateTimeRow(
-    date: String,
-    time: String,
-    context: android.content.Context,
-    cal: Calendar,
-    onDate: (String) -> Unit,
-    onTime: (String) -> Unit
+    date: String, time: String,
+    context: android.content.Context, cal: Calendar,
+    onDate: (String) -> Unit, onTime: (String) -> Unit
 ) {
-    Row(
-        modifier              = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedButton(
             onClick = {
                 DatePickerDialog(context, { _, y, m, d ->
@@ -890,26 +783,23 @@ private fun DateTimeRow(
                 }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH),
                     cal.get(Calendar.DAY_OF_MONTH)).show()
             },
-            modifier = Modifier.weight(1f),
-            shape    = RoundedCornerShape(10.dp),
-            colors   = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
-            border   = BorderStroke(1.dp, TealMid)
+            modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
+            border = BorderStroke(1.dp, TealMid)
         ) {
             Icon(Icons.Outlined.CalendarToday, null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(4.dp))
             Text(date, fontSize = 11.sp)
         }
-
         OutlinedButton(
             onClick = {
                 TimePickerDialog(context, { _, h, m ->
                     onTime("${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}")
                 }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
             },
-            modifier = Modifier.weight(1f),
-            shape    = RoundedCornerShape(10.dp),
-            colors   = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
-            border   = BorderStroke(1.dp, TealMid)
+            modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Teal),
+            border = BorderStroke(1.dp, TealMid)
         ) {
             Icon(Icons.Outlined.AccessTime, null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(4.dp))
@@ -918,50 +808,24 @@ private fun DateTimeRow(
     }
 }
 
-// ── Dialog field ───────────────────────────────────────────────────────────────
 @Composable
 private fun DialogField(
-    label: String,
-    value: String,
+    label: String, value: String,
     onValueChange: (String) -> Unit,
-    keyboardType: KeyboardType,
-    placeholder: String
+    keyboardType: KeyboardType, placeholder: String
 ) {
     Column {
         Text(label, fontSize = 12.sp, color = GrayMuted, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(6.dp))
         OutlinedTextField(
-            value           = value,
-            onValueChange   = onValueChange,
-            placeholder     = { Text(placeholder, color = GrayMuted, fontSize = 14.sp) },
-            singleLine      = true,
-            modifier        = Modifier.fillMaxWidth(),
-            shape           = RoundedCornerShape(12.dp),
+            value = value, onValueChange = onValueChange,
+            placeholder = { Text(placeholder, color = GrayMuted, fontSize = 14.sp) },
+            singleLine = true, modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            colors          = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor   = Teal,
-                unfocusedBorderColor = TealMid
-            )
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Teal, unfocusedBorderColor = TealMid)
         )
     }
 }
 
-// ── Color helpers ──────────────────────────────────────────────────────────────
-private fun glucoseColor(value: Float?): Color {
-    value ?: return Color(0xFF9CA3AF)
-    return when {
-        value < 70   -> Color(0xFF1E88E5)
-        value <= 99  -> Color(0xFF00897B)
-        value <= 125 -> Color(0xFFF57C00)
-        else         -> Color(0xFFD32F2F)
-    }
-}
-
-private fun cholesterolColor(value: Float?): Color {
-    value ?: return Color(0xFF9CA3AF)
-    return when {
-        value < 200  -> Color(0xFF00897B)
-        value <= 239 -> Color(0xFFF57C00)
-        else         -> Color(0xFFD32F2F)
-    }
-}

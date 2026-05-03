@@ -30,6 +30,8 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter
+import com.queryb.medlog.ui.utils.glucoseColor
+import com.queryb.medlog.ui.utils.cholesterolColor
 
 
 private val Teal      = Color(0xFF00897B)
@@ -305,22 +307,3 @@ private fun MiniStatCard(
     }
 }
 
-// ── Color helpers ─────────────────────────────────────────────────────────────
-private fun glucoseColor(value: Float?): Color {
-    value ?: return Color(0xFF9CA3AF)
-    return when {
-        value < 70   -> Color(0xFF1E88E5)
-        value <= 99  -> Color(0xFF00897B)
-        value <= 125 -> Color(0xFFF57C00)
-        else         -> Color(0xFFD32F2F)
-    }
-}
-
-private fun cholesterolColor(value: Float?): Color {
-    value ?: return Color(0xFF9CA3AF)
-    return when {
-        value < 200  -> Color(0xFF00897B)
-        value <= 239 -> Color(0xFFF57C00)
-        else         -> Color(0xFFD32F2F)
-    }
-}
