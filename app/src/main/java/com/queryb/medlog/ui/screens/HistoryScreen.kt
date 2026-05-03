@@ -30,6 +30,8 @@ import com.queryb.medlog.ui.viewmodel.LabViewModel
 import java.time.LocalDate
 import com.queryb.medlog.ui.utils.glucoseColor
 import com.queryb.medlog.ui.utils.cholesterolColor
+import com.queryb.medlog.ui.components.DeleteConfirmDialog
+import com.queryb.medlog.ui.components.LogoutConfirmDialog
 
 // ── Colors ─────────────────────────────────────────────────────────────────────
 private val Teal      = Color(0xFF00897B)
@@ -73,26 +75,16 @@ fun HistoryScreen(
     // ── Delete dialog ─────────────────────────────────────────────────────────
     if (showDeleteDialog) {
         resultToDelete?.let { result ->
-            AlertDialog(
-                onDismissRequest = { showDeleteDialog = false; resultToDelete = null },
-                icon  = { Icon(Icons.Default.DeleteOutline, null, tint = ErrorRed) },
-                title = { Text("Delete Entry") },
-                text  = { Text("Delete the entry dated ${result.date}? This cannot be undone.") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            viewModel.delete(result)
-                            showDeleteDialog = false
-                            resultToDelete   = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                    ) { Text("Delete") }
+            DeleteConfirmDialog(
+                date      = result.date,
+                onConfirm = {
+                    viewModel.delete(result)
+                    showDeleteDialog = false
+                    resultToDelete   = null
                 },
-                dismissButton = {
-                    TextButton(onClick = {
-                        showDeleteDialog = false
-                        resultToDelete   = null
-                    }) { Text("Cancel") }
+                onDismiss = {
+                    showDeleteDialog = false
+                    resultToDelete   = null
                 }
             )
         }

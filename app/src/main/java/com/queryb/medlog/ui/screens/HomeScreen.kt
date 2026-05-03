@@ -38,6 +38,8 @@ import androidx.compose.foundation.BorderStroke
 import kotlinx.coroutines.launch
 import com.queryb.medlog.ui.utils.glucoseColor
 import com.queryb.medlog.ui.utils.cholesterolColor
+import com.queryb.medlog.ui.components.DeleteConfirmDialog
+import com.queryb.medlog.ui.components.LogoutConfirmDialog
 
 // ── Colors ─────────────────────────────────────────────────────────────────────
 private val Teal      = Color(0xFF00897B)
@@ -78,40 +80,22 @@ fun HomeScreen(
         .map { it.cholesterol }.average().takeIf { !it.isNaN() }
 
     // Only show the 3 most recent entries in the dashboard card
-    val recentResults = results.take(3)
+    val recentResults = results.take(6)
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
     resultToDelete?.let { result ->
-        AlertDialog(
-            onDismissRequest = { resultToDelete = null },
-            title = { Text("Delete Entry") },
-            text  = { Text("Delete the entry dated ${result.date}?") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.delete(result); resultToDelete = null }) {
-                    Text("Delete", color = ErrorRed)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { resultToDelete = null }) { Text("Cancel") }
-            }
+        DeleteConfirmDialog(
+            date      = result.date,
+            onConfirm = { viewModel.delete(result); resultToDelete = null },
+            onDismiss = { resultToDelete = null }
         )
     }
 
     if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            icon  = { Icon(Icons.Default.Logout, null, tint = ErrorRed) },
-            title = { Text("Log Out") },
-            text  = { Text("Are you sure you want to log out?") },
-            confirmButton = {
-                Button(
-                    onClick = { showLogoutDialog = false; onLogout() },
-                    colors  = ButtonDefaults.buttonColors(containerColor = ErrorRed)
-                ) { Text("Log Out") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) { Text("Cancel") }
-            }
+        LogoutConfirmDialog(
+            username  = username,
+            onConfirm = { showLogoutDialog = false; onLogout() },
+            onDismiss = { showLogoutDialog = false }
         )
     }
 
