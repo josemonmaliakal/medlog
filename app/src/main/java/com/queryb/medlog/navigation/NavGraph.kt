@@ -78,6 +78,7 @@ fun NavGraph(
             OnboardingScreen(
                 username        = authManager.getUsername(),
                 onboardingPrefs = onboardingPrefs,
+                authManager     = authManager,    // ← ADD
                 onFinished      = {
                     navController.navigate(Routes.HOME) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }

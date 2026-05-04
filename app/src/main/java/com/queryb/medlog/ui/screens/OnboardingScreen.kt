@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.queryb.medlog.data.OnboardingPrefs
 import com.queryb.medlog.ui.components.MedLogLogo
 import kotlinx.coroutines.launch
+import com.queryb.medlog.auth.AuthManager
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 private val Teal      = Color(0xFF00897B)
@@ -56,6 +57,7 @@ private val trackingItems = listOf(
 fun OnboardingScreen(
     username: String,
     onboardingPrefs: OnboardingPrefs,
+    authManager: AuthManager,
     onFinished: () -> Unit
 ) {
     val scope      = rememberCoroutineScope()
@@ -77,6 +79,10 @@ fun OnboardingScreen(
         pagerState.animateScrollToPage(pagerState.currentPage - 1)
     }
     fun finish() {
+        // Save nickname as display name if user entered one
+        if (nickname.isNotBlank()) {
+            authManager.updateDisplayName(nickname.trim())
+        }
         onboardingPrefs.setTrackedItems(username, selectedItems.toSet())
         onboardingPrefs.setGlucoseUnit(username, if (glucoseIdx == 0) "mg/dL" else "mmol/L")
         onboardingPrefs.setWeightUnit(username, if (weightIdx == 0) "kg" else "lb")
