@@ -12,12 +12,13 @@ android {
         }
     }
 
+
     defaultConfig {
         applicationId = "com.queryb.medlog"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -39,6 +40,19 @@ android {
         compose = true
         viewBinding = true
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
+    }
+
+
 }
 
 dependencies {
@@ -58,7 +72,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     // Room (local database)
-    val room_version = "2.7.0-alpha11"
+    val room_version = "2.7.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
@@ -79,6 +93,34 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     // Horizontal Pager (ViewPager2 equivalent in Compose)
     implementation("androidx.compose.foundation:foundation:1.7.0")
+    implementation("androidx.sqlite:sqlite:2.4.0")
+    // biometric
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+
+    //Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
+    // Google API client — need BOTH
+    implementation("com.google.api-client:google-api-client:2.2.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.api-client:google-api-client-android:2.2.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+// Drive API
+    implementation("com.google.apis:google-api-services-drive:v3-rev20220815-2.0.0") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+
+// HTTP transport
+    implementation("com.google.http-client:google-http-client-gson:1.43.3") {
+        exclude(group = "org.apache.httpcomponents")
+    }
+    implementation("com.google.http-client:google-http-client-android:1.43.3") {
+        exclude(group = "org.apache.httpcomponents")
+    }
 
 
 }
