@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flatMapLatest
 import androidx.compose.runtime.snapshotFlow
-
+import com.queryb.medlog.data.OnboardingPrefs
 class LabViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao = LabDatabase.getDatabase(app).labResultDao()
@@ -35,6 +35,11 @@ class LabViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(result: LabResult) = viewModelScope.launch { dao.delete(result) }
+
+    fun getTrackedItems(onboardingPrefs: OnboardingPrefs, userId: String): Set<String> =
+        onboardingPrefs.getTrackedItems(userId).ifEmpty {
+            setOf("blood_sugar", "cholesterol") // default: show all if nothing selected
+        }
 
     suspend fun getAllSortedByDate(): List<LabResult> =
         dao.getAllResultsSortedByDate(userId)

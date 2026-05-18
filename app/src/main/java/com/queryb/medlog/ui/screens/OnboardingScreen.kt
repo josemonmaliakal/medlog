@@ -25,12 +25,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.queryb.medlog.auth.AuthManager
 import com.queryb.medlog.data.OnboardingPrefs
 import com.queryb.medlog.ui.components.MedLogLogo
 import kotlinx.coroutines.launch
-import com.queryb.medlog.auth.AuthManager
 
-// ── Colors ────────────────────────────────────────────────────────────────────
+// ── Colors ─────────────────────────────────────────────────────────────────────
 private val Teal      = Color(0xFF00897B)
 private val TealLight = Color(0xFFE8F5F3)
 private val TealMid   = Color(0xFFB2DFDB)
@@ -38,8 +38,9 @@ private val NavyDark  = Color(0xFF0D1B2A)
 private val GrayMuted = Color(0xFF9CA3AF)
 private val GrayText  = Color(0xFF6B7280)
 private val ScreenBg  = Color(0xFFF8FFFE)
+private val CardWhite = Color(0xFFFFFFFF)
 
-// ── Data ──────────────────────────────────────────────────────────────────────
+// ── Data ───────────────────────────────────────────────────────────────────────
 data class TrackingItem(
     val id: String,
     val label: String,
@@ -51,14 +52,14 @@ private val trackingItems = listOf(
     TrackingItem("cholesterol",  "Cholesterol",  Icons.Outlined.Favorite),
 )
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main composable ────────────────────────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
     username: String,
     onboardingPrefs: OnboardingPrefs,
     authManager: AuthManager,
-    onFinished: () -> Unit
+    onFinished: (Boolean) -> Unit        // Boolean = wantsBackup
 ) {
     val scope      = rememberCoroutineScope()
     val pagerState = rememberPagerState(pageCount = { 3 })
@@ -67,7 +68,9 @@ fun OnboardingScreen(
     var nickname      by remember { mutableStateOf("") }
     var glucoseIdx    by remember { mutableStateOf(0) }
     var weightIdx     by remember { mutableStateOf(0) }
+    var offerBackup   by remember { mutableStateOf(false) }
 
+    // Back gesture navigates between slides
     BackHandler(enabled = pagerState.currentPage > 0) {
         scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
     }
@@ -79,15 +82,12 @@ fun OnboardingScreen(
         pagerState.animateScrollToPage(pagerState.currentPage - 1)
     }
     fun finish() {
-        // Save nickname as display name if user entered one
-        if (nickname.isNotBlank()) {
-            authManager.updateDisplayName(nickname.trim())
-        }
+        if (nickname.isNotBlank()) authManager.updateDisplayName(nickname.trim())
         onboardingPrefs.setTrackedItems(username, selectedItems.toSet())
         onboardingPrefs.setGlucoseUnit(username, if (glucoseIdx == 0) "mg/dL" else "mmol/L")
         onboardingPrefs.setWeightUnit(username, if (weightIdx == 0) "kg" else "lb")
         onboardingPrefs.setCompleteFor(username)
-        onFinished()
+        onFinished(offerBackup)
     }
 
     Box(
@@ -96,14 +96,12 @@ fun OnboardingScreen(
             .background(ScreenBg)
     ) {
         HorizontalPager(
-            state = pagerState,
+            state             = pagerState,
             userScrollEnabled = false,
-            modifier = Modifier.fillMaxSize()
+            modifier          = Modifier.fillMaxSize()
         ) { page ->
             when (page) {
-                0 -> Slide1Welcome(
-                    onContinue = { goNext() }
-                )
+                0 -> Slide1Welcome(onContinue = { goNext() })
                 1 -> Slide2Track(
                     selectedItems = selectedItems,
                     onToggle      = { id ->
@@ -114,56 +112,51 @@ fun OnboardingScreen(
                     onBack     = { goBack() }
                 )
                 2 -> Slide3Preferences(
-                    nickname     = nickname,
-                    onNickname   = { nickname = it },
-                    glucoseIdx   = glucoseIdx,
-                    onGlucose    = { glucoseIdx = it },
-                    weightIdx    = weightIdx,
-                    onWeight     = { weightIdx = it },
-                    onGetStarted = { finish() },
-                    onBack       = { goBack() }
+                    nickname       = nickname,
+                    onNickname     = { nickname = it },
+                    glucoseIdx     = glucoseIdx,
+                    onGlucose      = { glucoseIdx = it },
+                    weightIdx      = weightIdx,
+                    onWeight       = { weightIdx = it },
+                    offerBackup    = offerBackup,
+                    onToggleBackup = { offerBackup = it },
+                    onGetStarted   = { finish() },
+                    onBack         = { goBack() }
                 )
             }
         }
     }
 }
 
-// ── Nav bar ───────────────────────────────────────────────────────────────────
-// showBack = false on slide 1, true on slides 2 & 3
-// onForward label changes to "finish" on slide 3
-
+// ── Shared NavBar ──────────────────────────────────────────────────────────────
 @Composable
 private fun NavBar(
     currentPage: Int,
-    totalPages: Int,
-    showBack: Boolean,
-    onBack: () -> Unit,
-    onForward: () -> Unit
+    totalPages:  Int,
+    showBack:    Boolean,
+    onBack:      () -> Unit,
+    onForward:   () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Left — back arrow or empty space to keep dots centered
+        // Left — back arrow or spacer
         Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
             if (showBack) {
                 FilledIconButton(
-                    onClick = onBack,
+                    onClick  = onBack,
                     modifier = Modifier.size(44.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
+                    colors   = IconButtonDefaults.filledIconButtonColors(
                         containerColor = TealLight
                     ),
                     shape = CircleShape
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Teal,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Icon(Icons.Filled.ArrowBack, "Back",
+                        tint = Teal, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -171,13 +164,13 @@ private fun NavBar(
         // Center — progress dots
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment     = Alignment.CenterVertically
         ) {
             repeat(totalPages) { i ->
                 val isActive = i == currentPage
                 val width by animateDpAsState(
                     targetValue = if (isActive) 24.dp else 8.dp,
-                    label = "dot_$i"
+                    label       = "dot_$i"
                 )
                 Box(
                     modifier = Modifier
@@ -189,21 +182,15 @@ private fun NavBar(
             }
         }
 
-        // Right — forward arrow (filled teal)
+        // Right — forward arrow
         FilledIconButton(
-            onClick = onForward,
+            onClick  = onForward,
             modifier = Modifier.size(44.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = Teal
-            ),
-            shape = CircleShape
+            colors   = IconButtonDefaults.filledIconButtonColors(containerColor = Teal),
+            shape    = CircleShape
         ) {
-            Icon(
-                imageVector = Icons.Filled.ArrowForward,
-                contentDescription = "Continue",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp)
-            )
+            Icon(Icons.Filled.ArrowForward, "Continue",
+                tint = Color.White, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -237,21 +224,21 @@ private fun Slide1Welcome(onContinue: () -> Unit) {
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Welcome to MedLog",
-                fontSize = 28.sp,
+                text       = "Welcome to MedLog",
+                fontSize   = 28.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = NavyDark,
-                textAlign = TextAlign.Center,
+                color      = NavyDark,
+                textAlign  = TextAlign.Center,
                 lineHeight = 34.sp
             )
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Log blood sugar, cholesterol, blood pressure and more. See trends, share with your doctor.",
-                fontSize = 15.sp,
-                color = GrayText,
-                textAlign = TextAlign.Center,
+                text       = "Log blood sugar, cholesterol, blood pressure and more. See trends, share with your doctor.",
+                fontSize   = 15.sp,
+                color      = GrayText,
+                textAlign  = TextAlign.Center,
                 lineHeight = 22.sp
             )
 
@@ -276,7 +263,6 @@ private fun Slide1Welcome(onContinue: () -> Unit) {
             )
         }
 
-        // Nav bar — slide 1 has no back
         HorizontalDivider(color = TealMid.copy(alpha = 0.4f), thickness = 1.dp)
         NavBar(
             currentPage = 0,
@@ -295,7 +281,7 @@ private fun FeaturePoint(icon: ImageVector, title: String, desc: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White)
+            .background(CardWhite)
             .border(1.dp, TealMid, RoundedCornerShape(14.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -307,15 +293,12 @@ private fun FeaturePoint(icon: ImageVector, title: String, desc: String) {
                 .background(TealLight),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = null,
-                tint = Teal, modifier = Modifier.size(24.dp))
+            Icon(icon, null, tint = Teal, modifier = Modifier.size(24.dp))
         }
         Spacer(Modifier.width(14.dp))
         Column {
-            Text(title, fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp, color = NavyDark)
-            Text(desc, fontSize = 12.sp,
-                color = GrayMuted, lineHeight = 17.sp)
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = NavyDark)
+            Text(desc,  fontSize = 12.sp, color = GrayMuted, lineHeight = 17.sp)
         }
     }
 }
@@ -324,9 +307,9 @@ private fun FeaturePoint(icon: ImageVector, title: String, desc: String) {
 @Composable
 private fun Slide2Track(
     selectedItems: List<String>,
-    onToggle: (String) -> Unit,
-    onContinue: () -> Unit,
-    onBack: () -> Unit
+    onToggle:      (String) -> Unit,
+    onContinue:    () -> Unit,
+    onBack:        () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -343,10 +326,10 @@ private fun Slide2Track(
         ) {
             Text(
                 "What would you like to track?",
-                fontSize = 26.sp,
+                fontSize   = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = NavyDark,
-                textAlign = TextAlign.Center,
+                color      = NavyDark,
+                textAlign  = TextAlign.Center,
                 lineHeight = 32.sp
             )
 
@@ -354,15 +337,15 @@ private fun Slide2Track(
 
             Text(
                 "Pick everything you want to log. You can change this later.",
-                fontSize = 14.sp,
-                color = GrayText,
+                fontSize  = 14.sp,
+                color     = GrayText,
                 textAlign = TextAlign.Center
             )
 
             Spacer(Modifier.height(32.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 trackingItems.forEach { item ->
@@ -390,64 +373,58 @@ private fun Slide2Track(
 
 @Composable
 private fun TrackingCard(
-    item: TrackingItem,
+    item:     TrackingItem,
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick:  () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (selected) TealLight else Color.White,
-        label = "card_bg"
+        targetValue = if (selected) TealLight else CardWhite,
+        label       = "card_bg"
     )
     val borderColor by animateColorAsState(
         targetValue = if (selected) Teal else Color(0xFFE0E0E0),
-        label = "card_border"
+        label       = "card_border"
     )
 
     Card(
-        onClick = onClick,
-        modifier = modifier.aspectRatio(0.95f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        border = BorderStroke(
-            width = if (selected) 2.dp else 1.dp,
-            color = borderColor
-        ),
+        onClick   = onClick,
+        modifier  = modifier.aspectRatio(0.95f),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = bgColor),
+        border    = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
         elevation = CardDefaults.cardElevation(if (selected) 0.dp else 2.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize().padding(14.dp)) {
             Column(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier              = Modifier.fillMaxSize(),
+                verticalArrangement   = Arrangement.Center,
+                horizontalAlignment   = Alignment.CenterHorizontally
             ) {
                 Box(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
                         .background(
-                            if (selected) Teal.copy(alpha = 0.15f)
-                            else Color(0xFFF0F0F0)
+                            if (selected) Teal.copy(alpha = 0.15f) else Color(0xFFF0F0F0)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        item.icon,
-                        contentDescription = null,
-                        tint = if (selected) Teal else GrayMuted,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Icon(item.icon, null,
+                        tint     = if (selected) Teal else GrayMuted,
+                        modifier = Modifier.size(28.dp))
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
                     item.label,
-                    fontSize = 13.sp,
+                    fontSize   = 13.sp,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (selected) Teal else NavyDark,
-                    textAlign = TextAlign.Center
+                    color      = if (selected) Teal else NavyDark,
+                    textAlign  = TextAlign.Center
                 )
             }
 
+            // Checkmark badge
             androidx.compose.animation.AnimatedVisibility(
                 visible  = selected,
                 enter    = scaleIn(spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(),
@@ -461,12 +438,8 @@ private fun TrackingCard(
                         .background(Teal),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Icon(Icons.Default.Check, null,
+                        tint = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -476,14 +449,16 @@ private fun TrackingCard(
 // ── Slide 3 — Preferences ─────────────────────────────────────────────────────
 @Composable
 private fun Slide3Preferences(
-    nickname: String,
-    onNickname: (String) -> Unit,
-    glucoseIdx: Int,
-    onGlucose: (Int) -> Unit,
-    weightIdx: Int,
-    onWeight: (Int) -> Unit,
-    onGetStarted: () -> Unit,
-    onBack: () -> Unit
+    nickname:       String,
+    onNickname:     (String) -> Unit,
+    glucoseIdx:     Int,
+    onGlucose:      (Int) -> Unit,
+    weightIdx:      Int,
+    onWeight:       (Int) -> Unit,
+    offerBackup:    Boolean,
+    onToggleBackup: (Boolean) -> Unit,
+    onGetStarted:   () -> Unit,
+    onBack:         () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -500,30 +475,31 @@ private fun Slide3Preferences(
         ) {
             Text(
                 "Set your preferences",
-                fontSize = 26.sp,
+                fontSize   = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = NavyDark,
-                textAlign = TextAlign.Center
+                color      = NavyDark,
+                textAlign  = TextAlign.Center
             )
 
             Spacer(Modifier.height(28.dp))
 
+            // ── Name card ─────────────────────────────────────────────────────
             PrefCard {
                 Text(
                     "What should we call you?",
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
-                    color = NavyDark
+                    fontSize   = 14.sp,
+                    color      = NavyDark
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = nickname,
+                    value         = nickname,
                     onValueChange = onNickname,
-                    placeholder = { Text("Your name or nickname", color = GrayMuted) },
-                    leadingIcon = { Icon(Icons.Outlined.Person, null, tint = Teal) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    placeholder   = { Text("Your name or nickname", color = GrayMuted) },
+                    leadingIcon   = { Icon(Icons.Outlined.Person, null, tint = Teal) },
+                    singleLine    = true,
+                    modifier      = Modifier.fillMaxWidth(),
+                    shape         = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Words
                     ),
@@ -536,6 +512,7 @@ private fun Slide3Preferences(
 
             Spacer(Modifier.height(14.dp))
 
+            // ── Glucose unit ──────────────────────────────────────────────────
             PrefCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Bloodtype, null,
@@ -554,6 +531,7 @@ private fun Slide3Preferences(
 
             Spacer(Modifier.height(14.dp))
 
+            // ── Weight unit ───────────────────────────────────────────────────
             PrefCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.FitnessCenter, null,
@@ -572,15 +550,67 @@ private fun Slide3Preferences(
 
             Spacer(Modifier.height(14.dp))
 
-            // Privacy card
+            // ── Google Drive backup toggle ─────────────────────────────────────
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = TealLight),
-                border = BorderStroke(1.dp, TealMid)
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(16.dp),
+                colors    = CardDefaults.cardColors(containerColor = CardWhite),
+                border    = BorderStroke(1.dp, TealMid),
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier          = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(TealLight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Outlined.CloudSync, null,
+                            tint = Teal, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Back up to Google Drive",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 13.sp,
+                            color      = NavyDark
+                        )
+                        Text(
+                            "Optional — set up later in settings",
+                            fontSize = 11.sp,
+                            color    = GrayMuted
+                        )
+                    }
+                    Switch(
+                        checked         = offerBackup,
+                        onCheckedChange = onToggleBackup,
+                        colors          = SwitchDefaults.colors(
+                            checkedThumbColor   = Color.White,
+                            checkedTrackColor   = Teal,
+                            uncheckedThumbColor = GrayMuted,
+                            uncheckedTrackColor = Color(0xFFE0E0E0)
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ── Privacy card ──────────────────────────────────────────────────
+            Card(
+                modifier  = Modifier.fillMaxWidth(),
+                shape     = RoundedCornerShape(14.dp),
+                colors    = CardDefaults.cardColors(containerColor = TealLight),
+                border    = BorderStroke(1.dp, TealMid),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Row(
+                    modifier          = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.Top
                 ) {
                     Box(
@@ -598,14 +628,14 @@ private fun Slide3Preferences(
                         Text(
                             "Your data is private",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = NavyDark
+                            fontSize   = 13.sp,
+                            color      = NavyDark
                         )
                         Spacer(Modifier.height(3.dp))
                         Text(
                             "Stored locally on this device. Optional cloud sync available later.",
-                            fontSize = 12.sp,
-                            color = GrayText,
+                            fontSize   = 12.sp,
+                            color      = GrayText,
                             lineHeight = 17.sp
                         )
                     }
@@ -613,7 +643,6 @@ private fun Slide3Preferences(
             }
         }
 
-        // Nav bar — slide 3, forward triggers finish
         HorizontalDivider(color = TealMid.copy(alpha = 0.4f), thickness = 1.dp)
         NavBar(
             currentPage = 2,
@@ -626,22 +655,22 @@ private fun Slide3Preferences(
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 @Composable
 private fun PrefCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, TealMid),
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+        border    = BorderStroke(1.dp, TealMid),
         elevation = CardDefaults.cardElevation(0.dp),
-        content = { Column(modifier = Modifier.padding(18.dp), content = content) }
+        content   = { Column(modifier = Modifier.padding(18.dp), content = content) }
     )
 }
 
 @Composable
 private fun UnitToggle(
-    options: List<String>,
+    options:  List<String>,
     selected: Int,
     onSelect: (Int) -> Unit
 ) {
@@ -657,11 +686,11 @@ private fun UnitToggle(
             val isSelected = index == selected
             val bgColor by animateColorAsState(
                 targetValue = if (isSelected) Teal else Color.Transparent,
-                label = "toggle_bg_$index"
+                label       = "toggle_bg_$index"
             )
             val textColor by animateColorAsState(
                 targetValue = if (isSelected) Color.White else GrayText,
-                label = "toggle_text_$index"
+                label       = "toggle_text_$index"
             )
             Box(
                 modifier = Modifier
@@ -675,8 +704,8 @@ private fun UnitToggle(
                 Text(
                     label,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 14.sp,
-                    color = textColor
+                    fontSize   = 14.sp,
+                    color      = textColor
                 )
             }
         }

@@ -18,6 +18,7 @@ object Routes {
     const val DETAIL         = "detail/{metric}"
     const val HISTORY        = "history"
     const val FORGOT         = "forgot_password"
+    const val BACKUP   = "backup"
 
     fun detail(metric: String) = "detail/$metric"
 }
@@ -78,10 +79,17 @@ fun NavGraph(
             OnboardingScreen(
                 username        = authManager.getUsername(),
                 onboardingPrefs = onboardingPrefs,
-                authManager     = authManager,    // ← ADD
-                onFinished      = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
+                authManager     = authManager,
+                onFinished      = { wantsBackup ->
+                    if (wantsBackup) {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        }
+                        navController.navigate(Routes.BACKUP)
+                    } else {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        }
                     }
                 }
             )
@@ -97,7 +105,9 @@ fun NavGraph(
                 onDetailClick  = { metric -> navController.navigate(Routes.detail(metric)) },
                 onProfileClick = { navController.navigate(Routes.PROFILE) },
                 onHistoryClick = { navController.navigate(Routes.HISTORY) },
-                onLogout       = { goLogin() }
+                onLogout       = { goLogin() },
+                trackedItems    = onboardingPrefs.getTrackedItems(authManager.getUsername())
+                    .ifEmpty { setOf("blood_sugar", "cholesterol") }
             )
         }
 
@@ -114,8 +124,11 @@ fun NavGraph(
         composable(Routes.PROFILE) {
             ProfileScreen(
                 authManager = authManager,
+                onboardingPrefs = onboardingPrefs,
                 onBack      = { navController.popBackStack() },
-                onLogout    = { goLogin() }
+                onLogout    = { goLogin() },
+                onBackupClick = { navController.navigate(Routes.BACKUP) }
+
             )
         }
 
@@ -140,6 +153,13 @@ fun NavGraph(
         composable(Routes.HISTORY) {
             HistoryScreen(
                 viewModel = viewModel,
+                onBack    = { navController.popBackStack() }
+            )
+        }
+        composable(Routes.BACKUP) {
+            BackupScreen(
+                viewModel = viewModel,
+                userId    = authManager.getUsername(),
                 onBack    = { navController.popBackStack() }
             )
         }

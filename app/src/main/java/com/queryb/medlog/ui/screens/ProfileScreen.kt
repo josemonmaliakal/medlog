@@ -22,12 +22,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Info
 import com.queryb.medlog.auth.AuthManager
 import androidx.compose.ui.platform.LocalContext
 import com.queryb.medlog.ui.components.LogoutConfirmDialog
 import androidx.fragment.app.FragmentActivity
 import com.queryb.medlog.auth.BiometricHelper
 import com.queryb.medlog.auth.BiometricResult
+import com.queryb.medlog.backup.DriveBackupManager
+import com.queryb.medlog.data.OnboardingPrefs
+
 
 
 // ── Colors ─────────────────────────────────────────────────────────────────────
@@ -46,8 +53,11 @@ private val ErrorLight = Color(0xFFFFEBEE)
 @Composable
 fun ProfileScreen(
     authManager: AuthManager,
+    onboardingPrefs: OnboardingPrefs,
     onBack: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onBackupClick: () -> Unit
+
 ) {
     // ── State ─────────────────────────────────────────────────────────────────
     var displayName     by remember { mutableStateOf(authManager.getDisplayName()) }
@@ -72,6 +82,14 @@ fun ProfileScreen(
         mutableStateOf(authManager.isBiometricEnabledForCurrent())
     }
     val biometricAvailable = remember { BiometricHelper.isAvailable(context) }
+    val driveManager = remember { DriveBackupManager(context) }
+    var isBackedUp   by remember { mutableStateOf(driveManager.isSignedIn()) }
+    var trackedItems by remember {
+        mutableStateOf(
+            onboardingPrefs.getTrackedItems(authManager.getUsername())
+                .ifEmpty { setOf("blood_sugar", "cholesterol") }
+        )
+    }
 
     // ── Logout dialog ─────────────────────────────────────────────────────────
     if (showLogoutDialog) {
@@ -247,6 +265,139 @@ fun ProfileScreen(
                     Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Save Changes", fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            // --- Selection card -----
+            ProfileCard(title = "Tracking Preferences", icon = Icons.Outlined.Tune) {
+                Text(
+                    "Select what you want to track and see on your dashboard.",
+                    fontSize = 12.sp,
+                    color = GrayMuted,
+                    lineHeight = 17.sp
+                )
+                Spacer(Modifier.height(14.dp))
+
+                val options = listOf(
+                    "blood_sugar"  to "Blood Sugar",
+                    "cholesterol"  to "Cholesterol"
+                )
+
+                options.forEach { (id, label) ->
+                    val isSelected = trackedItems.contains(id)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) TealLight else Color(0xFFF5F5F5))
+                            .border(
+                                1.dp,
+                                if (isSelected) Teal else Color(0xFFE0E0E0),
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable {
+                                trackedItems = if (isSelected && trackedItems.size > 1) {
+                                    trackedItems - id      // prevent deselecting all
+                                } else {
+                                    trackedItems + id
+                                }
+                                onboardingPrefs.setTrackedItems(authManager.getUsername(), trackedItems)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (id == "blood_sugar") Icons.Outlined.Bloodtype
+                            else Icons.Outlined.Favorite,
+                            contentDescription = null,
+                            tint = if (isSelected) Teal else GrayMuted,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            label,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            fontSize   = 14.sp,
+                            color      = if (isSelected) Teal else NavyDark,
+                            modifier   = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(Icons.Default.CheckCircle, null,
+                                tint = Teal, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // Hint when only one selected
+                if (trackedItems.size == 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFFFF3E0))
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.Info, null,
+                            tint = Color(0xFFF57C00), modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "At least one option must remain selected",
+                            fontSize = 11.sp, color = Color(0xFFF57C00)
+                        )
+                    }
+                }
+            }
+
+            // ── Backup card ───────────────────────────────────────────────────────────────
+            ProfileCard(title = "Data Backup", icon = Icons.Outlined.CloudSync) {
+                Row(
+                    modifier          = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Google Drive Backup",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize   = 14.sp,
+                            color      = NavyDark
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            if (isBackedUp) "Connected — your data is backed up"
+                            else "Not connected — tap to set up backup",
+                            fontSize   = 12.sp,
+                            color      = if (isBackedUp) Teal else GrayMuted,
+                            lineHeight = 17.sp
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = GrayMuted
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick   = onBackupClick,          // ← wired via parameter below
+                    modifier  = Modifier.fillMaxWidth().height(46.dp),
+                    shape     = RoundedCornerShape(12.dp),
+                    colors    = ButtonDefaults.buttonColors(containerColor = Teal),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)
+                ) {
+                    Icon(
+                        if (isBackedUp) Icons.Default.CloudSync else Icons.Default.CloudUpload,
+                        null, modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isBackedUp) "Manage Backup" else "Set Up Backup",
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
