@@ -61,7 +61,8 @@ fun HomeScreen(
     onDetailClick: (String) -> Unit,
     onProfileClick: () -> Unit,
     onHistoryClick: () -> Unit,           // ← NEW
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    trackedItems: Set<String> = setOf("blood_sugar", "cholesterol")
 ) {
     val results by viewModel.results.collectAsState()
     val scope   = rememberCoroutineScope()
@@ -102,7 +103,9 @@ fun HomeScreen(
     if (showQuickAdd) {
         QuickAddDialog(
             onDismiss = { showQuickAdd = false },
-            onSave    = { result -> viewModel.insert(result); showQuickAdd = false }
+            onSave    = { result -> viewModel.insert(result); showQuickAdd = false },
+            trackedItems = trackedItems
+
         )
     }
 
@@ -210,24 +213,29 @@ fun HomeScreen(
                                 modifier              = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                StatCard(
-                                    modifier   = Modifier.weight(1f),
-                                    icon       = Icons.Outlined.Bloodtype,
-                                    label      = "Blood Sugar",
-                                    value      = latestGlucose?.let { "%.1f".format(it) } ?: "--",
-                                    unit       = "mg/dL",
-                                    trendColor = glucoseColor(latestGlucose),
-                                    onClick    = { onDetailClick("glucose") }
-                                )
-                                StatCard(
-                                    modifier   = Modifier.weight(1f),
-                                    icon       = Icons.Outlined.Favorite,
-                                    label      = "Cholesterol",
-                                    value      = latestCholesterol?.let { "%.1f".format(it) } ?: "--",
-                                    unit       = "mg/dL",
-                                    trendColor = cholesterolColor(latestCholesterol),
-                                    onClick    = { onDetailClick("cholesterol") }
-                                )
+                                if (trackedItems.contains("blood_sugar")) {
+                                    StatCard(
+                                        modifier = Modifier.weight(1f),
+                                        icon = Icons.Outlined.Bloodtype,
+                                        label = "Blood Sugar",
+                                        value = latestGlucose?.let { "%.1f".format(it) } ?: "--",
+                                        unit = "mg/dL",
+                                        trendColor = glucoseColor(latestGlucose),
+                                        onClick = { onDetailClick("glucose") }
+                                    )
+                                }
+                                if (trackedItems.contains("cholesterol")) {
+                                    StatCard(
+                                        modifier = Modifier.weight(1f),
+                                        icon = Icons.Outlined.Favorite,
+                                        label = "Cholesterol",
+                                        value = latestCholesterol?.let { "%.1f".format(it) }
+                                            ?: "--",
+                                        unit = "mg/dL",
+                                        trendColor = cholesterolColor(latestCholesterol),
+                                        onClick = { onDetailClick("cholesterol") }
+                                    )
+                                }
                             }
                         }
 
@@ -239,22 +247,26 @@ fun HomeScreen(
                                 modifier              = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                StatCard(
-                                    modifier   = Modifier.weight(1f),
-                                    icon       = Icons.Outlined.QueryStats,
-                                    label      = "Avg Sugar",
-                                    value      = avgGlucose?.let { "%.1f".format(it) } ?: "--",
-                                    unit       = "mg/dL",
-                                    trendColor = Teal
-                                )
-                                StatCard(
-                                    modifier   = Modifier.weight(1f),
-                                    icon       = Icons.Outlined.BarChart,
-                                    label      = "Avg Cholesterol",
-                                    value      = avgCholesterol?.let { "%.1f".format(it) } ?: "--",
-                                    unit       = "mg/dL",
-                                    trendColor = Teal
-                                )
+                                if (trackedItems.contains("blood_sugar")) {
+                                    StatCard(
+                                        modifier = Modifier.weight(1f),
+                                        icon = Icons.Outlined.QueryStats,
+                                        label = "Avg Sugar",
+                                        value = avgGlucose?.let { "%.1f".format(it) } ?: "--",
+                                        unit = "mg/dL",
+                                        trendColor = Teal
+                                    )
+                                }
+                                if (trackedItems.contains("cholesterol")) {
+                                    StatCard(
+                                        modifier = Modifier.weight(1f),
+                                        icon = Icons.Outlined.BarChart,
+                                        label = "Avg Cholesterol",
+                                        value = avgCholesterol?.let { "%.1f".format(it) } ?: "--",
+                                        unit = "mg/dL",
+                                        trendColor = Teal
+                                    )
+                                }
                             }
                         }
 
@@ -616,7 +628,7 @@ private fun StatCard(
 
 // ── Quick Add Dialog ───────────────────────────────────────────────────────────
 @Composable
-private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit) {
+private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit, trackedItems: Set<String> = setOf("blood_sugar", "cholesterol") ) {
     val context = LocalContext.current
     val cal     = Calendar.getInstance()
 
@@ -638,12 +650,17 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit) {
     }
     var errorMsg    by remember { mutableStateOf("") }
 
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape     = RoundedCornerShape(24.dp),
             colors    = CardDefaults.cardColors(containerColor = CardWhite),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
+            val tabs = buildList {
+                if (trackedItems.contains("blood_sugar")) add("Blood Sugar")
+                if (trackedItems.contains("cholesterol")) add("Cholesterol")
+            }.ifEmpty { listOf("Blood Sugar", "Cholesterol") }
             Column(modifier = Modifier.padding(24.dp)) {
                 Text("Log Reading", fontWeight = FontWeight.ExtraBold,
                     fontSize = 20.sp, color = NavyDark)
@@ -658,7 +675,8 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit) {
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    listOf("Blood Sugar", "Cholesterol").forEachIndexed { index, label ->
+
+                    tabs.forEachIndexed { index, label ->
                         val active = index == selectedTab
                         Box(
                             modifier = Modifier
@@ -677,8 +695,8 @@ private fun QuickAddDialog(onDismiss: () -> Unit, onSave: (LabResult) -> Unit) {
                 }
 
                 Spacer(Modifier.height(20.dp))
-
-                if (selectedTab == 0) {
+                val selectedType = tabs.getOrNull(selectedTab) ?: "Blood Sugar"
+                if (selectedType == "Blood Sugar") {
                     DialogField("Blood Sugar (mg/dL)", sugarValue,
                         { sugarValue = it; errorMsg = "" }, KeyboardType.Decimal, "e.g. 95")
                     Spacer(Modifier.height(14.dp))
